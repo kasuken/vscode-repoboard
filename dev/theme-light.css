@@ -1,0 +1,31 @@
+/* VS Code Light Modern tokens. */
+:root {
+  --vscode-editor-background: #ffffff;
+  --vscode-foreground: #3b3b3b;
+  --vscode-descriptionForeground: #6f6f6f;
+  --vscode-widget-border: #e5e5e5;
+  --vscode-focusBorder: #005fb8;
+  --vscode-font-family: "Segoe WPC", "Segoe UI", sans-serif;
+  --vscode-editor-font-family: Consolas, "Courier New", monospace;
+  --vscode-button-background: #005fb8;
+  --vscode-button-hoverBackground: #0258a8;
+  --vscode-button-foreground: #ffffff;
+  --vscode-button-secondaryBackground: #e5e5e5;
+  --vscode-button-secondaryHoverBackground: #cccccc;
+  --vscode-button-secondaryForeground: #3b3b3b;
+  --vscode-input-background: #ffffff;
+  --vscode-input-foreground: #3b3b3b;
+  --vscode-input-border: #cecece;
+  --vscode-dropdown-background: #ffffff;
+  --vscode-dropdown-border: #cecece;
+  --vscode-gitDecoration-modifiedResourceForeground: #895503;
+  --vscode-gitDecoration-untrackedResourceForeground: #007100;
+  --vscode-gitDecoration-conflictingResourceForeground: #ad0707;
+  --vscode-editorWarning-foreground: #bf8803;
+  --vscode-charts-blue: #1a85ff;
+  --vscode-charts-green: #388a34;
+  --vscode-errorForeground: #a1260d;
+  --vscode-editorWidget-background: #f8f8f8;
+  --vscode-menu-background: #ffffff;
+  --vscode-menu-border: #cecece;
+}

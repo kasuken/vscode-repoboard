@@ -1,0 +1,504 @@
+{
+  "name": "vscode-repoboard",
+  "displayName": "Repo Board",
+  "description": "All your git repos on one board: auto-discovers every repo on disk, shows which ones are dirty, behind or ahead at a glance, and switches between them with Ctrl+Alt+P. Fetch or pull them all in one click.",
+  "version": "1.0.0",
+  "publisher": "emanuelebartolesi",
+  "author": {
+    "name": "Emanuele Bartolesi",
+    "url": "https://github.com/kasuken"
+  },
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#0e1626",
+    "theme": "dark"
+  },
+  "sponsor": {
+    "url": "https://github.com/sponsors/kasuken"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kasuken/vscode-repoboard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kasuken/vscode-repoboard/issues"
+  },
+  "homepage": "https://github.com/kasuken/vscode-repoboard#readme",
+  "qna": "https://github.com/kasuken/vscode-repoboard/discussions",
+  "license": "MIT",
+  "pricing": "Free",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "SCM Providers",
+    "Visualization",
+    "Other"
+  ],
+  "keywords": [
+    "project manager",
+    "projects",
+    "project switcher",
+    "repositories",
+    "repo",
+    "git",
+    "multi-repo",
+    "monorepo",
+    "dashboard",
+    "workspace",
+    "git status",
+    "fetch all",
+    "pull all",
+    "recent projects",
+    "favorites",
+    "productivity"
+  ],
+  "badges": [
+    {
+      "url": "https://img.shields.io/visual-studio-marketplace/v/emanuelebartolesi.vscode-repoboard?label=Marketplace&color=0e639c",
+      "href": "https://marketplace.visualstudio.com/items?itemName=emanuelebartolesi.vscode-repoboard",
+      "description": "Visual Studio Marketplace version"
+    },
+    {
+      "url": "https://img.shields.io/github/stars/kasuken/vscode-repoboard?style=social",
+      "href": "https://github.com/kasuken/vscode-repoboard",
+      "description": "GitHub stars"
+    }
+  ],
+  "extensionKind": [
+    "ui",
+    "workspace"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished",
+    "onWebviewPanel:repoBoard.dashboard"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "repoBoard.open",
+        "title": "Open Dashboard",
+        "category": "Repo Board",
+        "icon": "$(layout)"
+      },
+      {
+        "command": "repoBoard.switch",
+        "title": "Switch Project…",
+        "category": "Repo Board",
+        "icon": "$(search)"
+      },
+      {
+        "command": "repoBoard.addCurrent",
+        "title": "Add Current Folder",
+        "category": "Repo Board",
+        "icon": "$(add)"
+      },
+      {
+        "command": "repoBoard.addFolder",
+        "title": "Add Folder…",
+        "category": "Repo Board"
+      },
+      {
+        "command": "repoBoard.scan",
+        "title": "Scan Folders for Repos",
+        "category": "Repo Board",
+        "icon": "$(radio-tower)"
+      },
+      {
+        "command": "repoBoard.addScanRoot",
+        "title": "Add Folder to Scan…",
+        "category": "Repo Board"
+      },
+      {
+        "command": "repoBoard.refresh",
+        "title": "Refresh Status",
+        "category": "Repo Board",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "repoBoard.fetchAll",
+        "title": "Fetch All Repos",
+        "category": "Repo Board",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "repoBoard.pullAll",
+        "title": "Pull All Repos That Are Behind (fast-forward only)",
+        "category": "Repo Board"
+      },
+      {
+        "command": "repoBoard.togglePinCurrent",
+        "title": "Pin / Unpin Current Project",
+        "category": "Repo Board"
+      },
+      {
+        "command": "repoBoard.removeMissing",
+        "title": "Remove Projects Whose Folder Is Gone",
+        "category": "Repo Board"
+      },
+      {
+        "command": "repoBoard.resetIgnored",
+        "title": "Forget Removed Repos (allow re-discovery)",
+        "category": "Repo Board"
+      },
+      {
+        "command": "repoBoard.openDataFile",
+        "title": "Open Data File",
+        "category": "Repo Board"
+      },
+      {
+        "command": "repoBoard.item.open",
+        "title": "Open",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "repoBoard.item.openNewWindow",
+        "title": "Open in New Window",
+        "icon": "$(empty-window)"
+      },
+      {
+        "command": "repoBoard.item.terminal",
+        "title": "Open Terminal Here",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "repoBoard.item.reveal",
+        "title": "Reveal in File Explorer"
+      },
+      {
+        "command": "repoBoard.item.remote",
+        "title": "Open Remote in Browser",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "repoBoard.item.pin",
+        "title": "Pin",
+        "icon": "$(pin)"
+      },
+      {
+        "command": "repoBoard.item.unpin",
+        "title": "Unpin",
+        "icon": "$(pinned)"
+      },
+      {
+        "command": "repoBoard.item.remove",
+        "title": "Remove from Repo Board"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "repoBoard.switch",
+        "key": "ctrl+alt+p",
+        "mac": "cmd+alt+p"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "repoBoard",
+          "title": "Repo Board",
+          "icon": "media/activity.svg"
+        }
+      ]
+    },
+    "views": {
+      "repoBoard": [
+        {
+          "id": "repoBoard.projects",
+          "name": "Projects",
+          "icon": "media/activity.svg"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "repoBoard.projects",
+        "contents": "No projects yet.\n[Scan a folder for repos](command:repoBoard.addScanRoot)\n[Add current folder](command:repoBoard.addCurrent)\n[Open dashboard](command:repoBoard.open)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "repoBoard.open",
+          "when": "view == repoBoard.projects",
+          "group": "navigation@1"
+        },
+        {
+          "command": "repoBoard.switch",
+          "when": "view == repoBoard.projects",
+          "group": "navigation@2"
+        },
+        {
+          "command": "repoBoard.refresh",
+          "when": "view == repoBoard.projects",
+          "group": "navigation@3"
+        },
+        {
+          "command": "repoBoard.addCurrent",
+          "when": "view == repoBoard.projects",
+          "group": "1_add@1"
+        },
+        {
+          "command": "repoBoard.addFolder",
+          "when": "view == repoBoard.projects",
+          "group": "1_add@2"
+        },
+        {
+          "command": "repoBoard.addScanRoot",
+          "when": "view == repoBoard.projects",
+          "group": "1_add@3"
+        },
+        {
+          "command": "repoBoard.scan",
+          "when": "view == repoBoard.projects",
+          "group": "1_add@4"
+        },
+        {
+          "command": "repoBoard.fetchAll",
+          "when": "view == repoBoard.projects",
+          "group": "2_git@1"
+        },
+        {
+          "command": "repoBoard.pullAll",
+          "when": "view == repoBoard.projects",
+          "group": "2_git@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "repoBoard.item.openNewWindow",
+          "when": "view == repoBoard.projects && viewItem =~ /^project/",
+          "group": "inline@1"
+        },
+        {
+          "command": "repoBoard.item.open",
+          "when": "view == repoBoard.projects && viewItem =~ /^project/",
+          "group": "1_open@1"
+        },
+        {
+          "command": "repoBoard.item.openNewWindow",
+          "when": "view == repoBoard.projects && viewItem =~ /^project/",
+          "group": "1_open@2"
+        },
+        {
+          "command": "repoBoard.item.terminal",
+          "when": "view == repoBoard.projects && viewItem =~ /^project/",
+          "group": "1_open@3"
+        },
+        {
+          "command": "repoBoard.item.reveal",
+          "when": "view == repoBoard.projects && viewItem =~ /^project/",
+          "group": "1_open@4"
+        },
+        {
+          "command": "repoBoard.item.remote",
+          "when": "view == repoBoard.projects && viewItem =~ /^project/",
+          "group": "1_open@5"
+        },
+        {
+          "command": "repoBoard.item.pin",
+          "when": "view == repoBoard.projects && viewItem == project",
+          "group": "2_manage@1"
+        },
+        {
+          "command": "repoBoard.item.unpin",
+          "when": "view == repoBoard.projects && viewItem == project.pinned",
+          "group": "2_manage@1"
+        },
+        {
+          "command": "repoBoard.item.remove",
+          "when": "view == repoBoard.projects && viewItem =~ /^project/",
+          "group": "2_manage@9"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "repoBoard.switch",
+          "when": "activeWebviewPanelId == repoBoard.dashboard",
+          "group": "navigation@1"
+        },
+        {
+          "command": "repoBoard.refresh",
+          "when": "activeWebviewPanelId == repoBoard.dashboard",
+          "group": "navigation@2"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "repoBoard.item.open",
+          "when": "false"
+        },
+        {
+          "command": "repoBoard.item.openNewWindow",
+          "when": "false"
+        },
+        {
+          "command": "repoBoard.item.terminal",
+          "when": "false"
+        },
+        {
+          "command": "repoBoard.item.reveal",
+          "when": "false"
+        },
+        {
+          "command": "repoBoard.item.remote",
+          "when": "false"
+        },
+        {
+          "command": "repoBoard.item.pin",
+          "when": "false"
+        },
+        {
+          "command": "repoBoard.item.unpin",
+          "when": "false"
+        },
+        {
+          "command": "repoBoard.item.remove",
+          "when": "false"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Repo Board",
+      "properties": {
+        "repoBoard.scanRoots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Folders that are scanned for git repositories, e.g. `C:\\code` or `~/src`. Every repo found underneath is added to the board.",
+          "scope": "machine"
+        },
+        "repoBoard.scanDepth": {
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 8,
+          "description": "How many folder levels below each scan root are searched for repositories."
+        },
+        "repoBoard.autoScan": {
+          "type": "boolean",
+          "default": true,
+          "description": "Re-scan the scan roots whenever the dashboard opens (at most every 10 minutes)."
+        },
+        "repoBoard.ignoreDirs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "node_modules",
+            "bower_components",
+            "vendor",
+            "bin",
+            "obj",
+            "dist",
+            "out",
+            "build",
+            "target",
+            ".venv",
+            "venv",
+            "__pycache__",
+            ".next",
+            ".nuxt",
+            ".gradle",
+            ".idea",
+            ".vs",
+            ".vscode",
+            "Library",
+            "Pods",
+            "DerivedData",
+            ".dart_tool",
+            ".cache",
+            "coverage"
+          ],
+          "description": "Folder names skipped by repo discovery and language detection."
+        },
+        "repoBoard.openInNewWindow": {
+          "type": "boolean",
+          "default": false,
+          "description": "Open projects in a new window by default (Ctrl/Cmd+click or Ctrl/Cmd+Enter does the opposite)."
+        },
+        "repoBoard.showOnStartup": {
+          "type": "boolean",
+          "default": false,
+          "description": "Open the dashboard when a window starts without a folder."
+        },
+        "repoBoard.defaultView": {
+          "type": "string",
+          "enum": [
+            "grid",
+            "list"
+          ],
+          "default": "grid",
+          "description": "Initial dashboard layout."
+        },
+        "repoBoard.defaultSort": {
+          "type": "string",
+          "enum": [
+            "manual",
+            "recent",
+            "name",
+            "commit",
+            "changes"
+          ],
+          "enumDescriptions": [
+            "Your own order (drag & drop)",
+            "Last opened first",
+            "Alphabetical",
+            "Most recent commit first",
+            "Most uncommitted / unsynced changes first"
+          ],
+          "default": "recent",
+          "description": "Initial sort order on the dashboard and in the switcher."
+        },
+        "repoBoard.fetchOnOpen": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run `git fetch` (non-interactive, in the background) when the dashboard opens so ahead/behind counts are real."
+        },
+        "repoBoard.cacheMinutes": {
+          "type": "number",
+          "default": 5,
+          "minimum": 0,
+          "description": "How long git status is reused before it is read again."
+        },
+        "repoBoard.detectLanguages": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a language bar per project (bounded, cached file scan)."
+        },
+        "repoBoard.maxFilesScanned": {
+          "type": "number",
+          "default": 10000,
+          "minimum": 100,
+          "description": "Upper bound on files inspected per project for language detection."
+        },
+        "repoBoard.statusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the current project in the status bar (click to switch)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsc -p tsconfig.test.json && node --test \"out/test/**/*.test.js\"",
+    "package": "npm run typecheck && npm test && npm run build && vsce package --no-dependencies",
+    "vscode:prepublish": "npm run build",
+    "publish": "npm run typecheck && npm test && vsce publish --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "~1.90.0",
+    "@vscode/codicons": "^0.0.36",
+    "@vscode/vsce": "^3.2.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.6.0"
+  }
+}

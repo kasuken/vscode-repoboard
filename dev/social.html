@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Repo Board social card</title>
+<style>
+  html, body { margin: 0; width: 1280px; height: 640px; overflow: hidden; }
+  body { background: radial-gradient(1200px 600px at 85% 20%, #1d3a63 0%, #0e1626 55%, #0a0f1a 100%); font-family: "Segoe UI Variable Display", "Segoe UI", sans-serif; color: #e8eef6; position: relative; }
+  .copy { position: absolute; left: 72px; top: 92px; width: 520px; }
+  .brand { display: flex; align-items: center; gap: 18px; }
+  .brand img { width: 84px; height: 84px; }
+  h1 { margin: 0; font-size: 58px; font-weight: 700; letter-spacing: -1.5px; }
+  p { font-size: 27px; line-height: 1.35; color: #b7c4d6; margin: 30px 0 0; }
+  .pills { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 34px; }
+  .pills span { font-size: 18px; padding: 7px 14px; border-radius: 999px; border: 1px solid #2f4566; color: #d5e0ee; background: rgba(255,255,255,.03); }
+  .pills b { font-weight: 600; }
+  .shot { position: absolute; left: 640px; top: 70px; width: 780px; border-radius: 12px; box-shadow: 0 30px 80px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.08); }
+  .strip { position: absolute; left: 72px; bottom: 70px; display: flex; gap: 6px; }
+  .strip i { width: 26px; height: 12px; border-radius: 2px; background: #2b3c56; }
+</style></head>
+<body>
+  <div class="copy">
+    <div class="brand"><img src="/images/logo.png" alt=""><h1>Repo Board</h1></div>
+    <p>Every git repo on your machine, on one board in VS Code.</p>
+    <div class="pills"><span><b>Auto-discovers</b> repos</span><span><b>Ctrl+Alt+P</b> switcher</span><span>Dirty · behind · ahead</span><span>Fetch &amp; pull all</span></div>
+  </div>
+  <img class="shot" src="/images/hero.png" alt="">
+  <div class="strip"><i style="background:#3fb950"></i><i></i><i style="background:#e3b341"></i><i style="background:#58a6ff"></i><i style="background:#3fb950"></i><i></i><i style="background:#e3b341"></i><i style="background:#3fb950"></i><i style="background:#f85149"></i><i></i><i style="background:#3fb950"></i><i style="background:#58a6ff"></i></div>
+</body></html>

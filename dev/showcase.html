@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Repo Board showcase</title>
+<link rel="stylesheet" href="/dist/codicons/codicon.css">
+<style>
+  /* Editor chrome for README screenshots. The board itself is the real webview (harness.html) in an iframe. */
+  :root { --chrome: #181818; --chrome-2: #1f1f1f; --line: #2b2b2b; --fg: #cccccc; --muted: #9d9d9d; --accent: #0078d4; }
+  body.light { --chrome: #f8f8f8; --chrome-2: #ffffff; --line: #e5e5e5; --fg: #3b3b3b; --muted: #6f6f6f; --accent: #005fb8; }
+  html, body { margin: 0; height: 100%; background: transparent; font: 13px "Segoe WPC", "Segoe UI", sans-serif; color: var(--fg); }
+  body { padding: var(--pad, 0); box-sizing: border-box; }
+  .window { height: 100%; display: grid; grid-template-rows: 35px 1fr 22px; background: var(--chrome); border: 1px solid var(--line); border-radius: var(--radius, 0); overflow: hidden; box-shadow: var(--shadow, none); }
+  .titlebar { display: flex; align-items: center; gap: 10px; padding: 0 12px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+  .lights { display: flex; gap: 8px; margin-right: 8px; }
+  .lights span { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; }
+  .lights span:nth-child(2) { background: #febc2e; }
+  .lights span:nth-child(3) { background: #28c840; }
+  .titlebar .title { flex: 1; text-align: center; margin-right: 80px; }
+  .main { display: grid; grid-template-columns: 48px 1fr; min-height: 0; }
+  .activity { display: flex; flex-direction: column; align-items: center; gap: 4px; padding-top: 6px; border-right: 1px solid var(--line); }
+  .activity .codicon, .activity img { font-size: 24px; width: 48px; height: 44px; display: grid; place-items: center; color: var(--muted); }
+  .activity .on { color: var(--fg); box-shadow: inset 2px 0 0 var(--accent); }
+  .activity .board { width: 48px; height: 44px; display: grid; place-items: center; box-shadow: inset 2px 0 0 var(--accent); }
+  .activity .board svg { width: 24px; height: 24px; color: var(--fg); }
+  .editor { display: grid; grid-template-rows: 35px 1fr; min-width: 0; min-height: 0; background: var(--chrome-2); }
+  .tabs { display: flex; background: var(--chrome); border-bottom: 1px solid var(--line); }
+  .tab { display: flex; align-items: center; gap: 8px; padding: 0 14px; color: var(--muted); border-right: 1px solid var(--line); }
+  .tab.on { background: var(--chrome-2); color: var(--fg); box-shadow: inset 0 1px 0 var(--accent); margin-bottom: -1px; }
+  .tab img { width: 16px; height: 16px; }
+  iframe { border: 0; width: 100%; height: 100%; display: block; }
+  .status { display: flex; align-items: center; gap: 16px; padding: 0 10px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); }
+  .status .codicon { font-size: 14px; vertical-align: -3px; margin-right: 4px; }
+  .status .remote { background: var(--accent); color: #fff; margin-left: -10px; padding: 0 10px; height: 100%; display: flex; align-items: center; }
+  .status .dirty { color: #e2c08d; }
+  body.light .status .dirty { color: #895503; }
+</style>
+</head>
+<body>
+<div class="window">
+  <div class="titlebar"><div class="lights"><span></span><span></span><span></span></div><div class="title">storefront — Visual Studio Code</div></div>
+  <div class="main">
+    <nav class="activity" aria-hidden="true">
+      <span class="codicon codicon-files"></span>
+      <span class="codicon codicon-search"></span>
+      <span class="codicon codicon-source-control"></span>
+      <span class="codicon codicon-debug-alt"></span>
+      <span class="codicon codicon-extensions"></span>
+      <span class="board"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><path d="M13.5 15h7.5M13.5 18h5M13.5 21h6.5" stroke-linecap="round"/></svg></span>
+    </nav>
+    <section class="editor">
+      <div class="tabs">
+        <div class="tab"><span class="codicon codicon-file-code"></span>page.tsx</div>
+        <div class="tab on"><img src="/media/icon.png" alt="">Repo Board<span class="codicon codicon-close"></span></div>
+      </div>
+      <iframe id="board" title="Repo Board"></iframe>
+    </section>
+  </div>
+  <footer class="status">
+    <span class="remote"><span class="codicon codicon-remote"></span></span>
+    <span><span class="codicon codicon-git-branch"></span>main*</span>
+    <span class="dirty"><span class="codicon codicon-repo"></span>storefront ●4</span>
+    <span style="flex:1"></span>
+    <span>Ln 42, Col 7</span><span>TypeScript JSX</span><span class="codicon codicon-bell"></span>
+  </footer>
+</div>
+<script>
+  const params = new URLSearchParams(location.search);
+  if (params.get('theme') === 'light') document.body.classList.add('light');
+  if (params.get('frame') === 'floating') {
+    document.body.style.setProperty('--pad', '28px');
+    document.body.style.setProperty('--radius', '10px');
+    document.body.style.setProperty('--shadow', '0 24px 60px rgba(0,0,0,.45)');
+  }
+  params.delete('frame');
+  document.getElementById('board').src = '/dev/harness.html?' + params.toString();
+</script>
+</body>
+</html>
