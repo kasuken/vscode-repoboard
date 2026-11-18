@@ -257,5 +257,4 @@ If Repo Board saves you time, [leave a review on the Marketplace](https://market
 star the [repository](https://github.com/kasuken/vscode-repoboard), or
 [sponsor the work](https://github.com/sponsors/kasuken). It really helps.
 
-Inspired by [Project Tiles](https://github.com/InvisibleF0x/project-tiles) by Dominik Mech. Released under the
-[MIT license](https://github.com/kasuken/vscode-repoboard/blob/main/LICENSE).
+Released under the [MIT license](https://github.com/kasuken/vscode-repoboard/blob/main/LICENSE).

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.1
+
+- Documentation updates.
+
 ## 1.1.0
 
 - **Setup guide**: a *Get started with Repo Board* walkthrough opens after install. It guides you through choosing the
