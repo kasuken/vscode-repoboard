@@ -1,10 +1,10 @@
 name: Release
 
-# Publishes to the VS Marketplace and creates a GitHub Release when a version tag (v*) is pushed.
-# Requires the VSCE_PAT repository secret (a Visual Studio Marketplace personal access token).
+# Manual only. Releases are normally published from a local machine with `vsce publish` plus
+# `gh release create`. This workflow is the fallback for publishing from CI; it needs the
+# VSCE_PAT repository secret (a Visual Studio Marketplace personal access token).
 on:
-  push:
-    tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run typecheck && npm test
@@ -25,7 +25,9 @@ jobs:
         run: npx @vscode/vsce publish --packagePath ./*.vsix
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: "*.vsix"
-          generate_release_notes: true
+      - name: Create GitHub release
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          gh release create "v$VERSION" ./*.vsix --title "v$VERSION" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
