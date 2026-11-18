@@ -6,6 +6,7 @@ import { changedFiles } from './domain/model';
 import { pathKey } from './domain/paths';
 import { DashboardPanel, VIEW_TYPE } from './ui/dashboardPanel';
 import { showSwitcher } from './ui/switcher';
+import { registerOnboarding } from './ui/onboarding';
 import { ProjectTree, projectArg } from './ui/tree';
 
 /**
@@ -15,6 +16,7 @@ import { ProjectTree, projectArg } from './ui/tree';
 export function activate(context: vscode.ExtensionContext): void {
   const app = new App(context);
   context.subscriptions.push(app);
+  registerOnboarding(context, app);
 
   const tree = new ProjectTree(app);
   const treeView = vscode.window.createTreeView('repoBoard.projects', { treeDataProvider: tree, showCollapseAll: true });

@@ -622,6 +622,7 @@ function emptyBoard(): HTMLElement {
       board?.canAddCurrent ? h('button', { type: 'button', class: 'btn', onclick: () => send({ type: 'addCurrent' }) }, icon('add'), 'Add current folder') : null,
       h('button', { type: 'button', class: 'btn', onclick: () => send({ type: 'addFolder' }) }, icon('folder'), 'Add one folder'),
     ),
+    h('p', { class: 'empty-guide' }, 'First time here? ', h('button', { type: 'button', class: 'link', onclick: () => send({ type: 'getStarted' }) }, 'Open the setup guide'), ' to scan your folders and choose whether Repo Board opens in new windows.'),
   );
 }
 
@@ -948,6 +949,10 @@ function openBoardMenu(anchor: HTMLElement): void {
     { label: 'Fetch all repos', icon: 'cloud-download', run: () => send({ type: 'fetchAll' }) },
     { label: 'Pull all repos that are behind', icon: 'repo-pull', run: () => send({ type: 'pullAll' }) },
     'sep',
+    board?.settings.startPage
+      ? { label: 'Stop opening on startup', icon: 'home', run: () => send({ type: 'startPage', on: false }) }
+      : { label: 'Use as start page', icon: 'home', run: () => send({ type: 'startPage', on: true }) },
+    { label: 'Setup guide', icon: 'rocket', run: () => send({ type: 'getStarted' }) },
     { label: 'Keyboard shortcuts', icon: 'keyboard', hint: '?', run: openHelp },
     { label: 'Settings', icon: 'settings-gear', run: () => send({ type: 'openSettings' }) },
   ]);

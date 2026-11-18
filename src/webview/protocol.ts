@@ -12,6 +12,7 @@ export interface BoardSettings {
   defaultView: ViewMode;
   defaultSort: SortMode;
   hasScanRoots: boolean;
+  startPage: boolean;
   isMac: boolean;
 }
 
@@ -67,4 +68,6 @@ export type WebviewMessage =
   | { type: 'addScanRoot' }
   | { type: 'fetchAll' }
   | { type: 'pullAll' }
-  | { type: 'openSettings' };
+  | { type: 'openSettings' }
+  | { type: 'getStarted' }
+  | { type: 'startPage'; on: boolean };

@@ -129,11 +129,23 @@ path, fetch, pull, push, pin, edit or remove. The common ones have single-key sh
    code --install-extension emanuelebartolesi.vscode-repoboard
    ```
 
-2. Click the Repo Board icon in the activity bar, or run **Repo Board: Open Dashboard** from the command palette.
-3. Choose **Scan a folder for repos** and pick the folder that holds your projects.
-4. From now on, press <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>P</kbd> to switch projects.
+2. The **Get started with Repo Board** guide opens by itself. It takes you through four steps:
+   - choose the folders that hold your repos
+   - open the board
+   - try the switcher
+   - optionally make Repo Board your start page
+
+   You can reopen it any time with **Repo Board: Get Started**.
+3. From now on, press <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>P</kbd> to switch projects.
 
 Want a single repo instead of a whole folder? Use **Repo Board: Add Current Folder** or **Add Folder…**.
+
+### Make it your start page
+
+Choose **Use Repo Board as start page** in the setup guide or in the board's **⋯** menu. Every new window that starts
+without a folder then opens the board, in place of VS Code's Welcome page: `repoBoard.showOnStartup` is turned on and
+`workbench.startupEditor` is set to `none`. **Repo Board: Stop Using Repo Board as Start Page** turns it off and
+restores your previous start-up setting.
 
 ## Keyboard shortcuts
 
@@ -159,6 +171,7 @@ The switcher keybinding is `repoBoard.switch`, so you can rebind it in **Keyboar
 
 | Command | What it does |
 | --- | --- |
+| Repo Board: Get Started | Opens the setup guide |
 | Repo Board: Open Dashboard | Opens the board in an editor tab |
 | Repo Board: Switch Project… | Opens the fuzzy project switcher |
 | Repo Board: Add Current Folder | Adds the open folder or `.code-workspace` |
@@ -171,6 +184,8 @@ The switcher keybinding is `repoBoard.switch`, so you can rebind it in **Keyboar
 | Repo Board: Pin / Unpin Current Project | Toggles the pin on the open project |
 | Repo Board: Remove Projects Whose Folder Is Gone | Cleans up deleted folders; unplugged drives are kept |
 | Repo Board: Forget Removed Repos | Lets scans add repos you removed earlier |
+| Repo Board: Use Repo Board as Start Page | Opens the board in every new empty window |
+| Repo Board: Stop Using Repo Board as Start Page | Restores your previous start-up behaviour |
 | Repo Board: Open Data File | Opens `catalog.json` for backup or hand editing |
 
 ## Settings

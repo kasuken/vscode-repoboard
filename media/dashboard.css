@@ -500,3 +500,7 @@ body.vscode-high-contrast .tile, body.vscode-high-contrast-light .tile { backgro
 /* Tag hues need darker ink on light themes to keep contrast. */
 body.vscode-light .chip.tag, body.vscode-light .tag, body.vscode-high-contrast-light .chip.tag, body.vscode-high-contrast-light .tag { color: hsl(var(--hue) 60% 33%); }
 body.vscode-light .chip.tag { border-color: hsl(var(--hue) 45% 45% / .4); }
+
+.empty-guide { margin-top: 18px !important; font-size: 12px; }
+.link { border: 0; padding: 0; background: none; color: var(--link); cursor: pointer; font: inherit; }
+.link:hover { text-decoration: underline; }

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.0
+
+- **Setup guide**: a *Get started with Repo Board* walkthrough opens after install. It guides you through choosing the
+  folders to scan, opening the board, trying the switcher and, optionally, making Repo Board your start page. Reopen it
+  with **Repo Board: Get Started**, from the sidebar menu or from the empty board.
+- **Start page**: **Use Repo Board as Start Page** opens the board in every new empty window in place of the Welcome
+  page; **Stop Using Repo Board as Start Page** restores your previous `workbench.startupEditor` value. Both are also
+  in the board's ⋯ menu.
+- Editors that don't open walkthroughs on install, such as some VS Code forks, show a one-time *Get started*
+  notification instead.
+
 ## 1.0.0
 
 First public release.

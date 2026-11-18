@@ -2,7 +2,7 @@
   "name": "vscode-repoboard",
   "displayName": "Repo Board",
   "description": "All your git repos on one board: auto-discovers every repo on disk, shows which ones are dirty, behind or ahead at a glance, and switches between them with Ctrl+Alt+P. Fetch or pull them all in one click.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "emanuelebartolesi",
   "author": {
     "name": "Emanuele Bartolesi",
@@ -184,6 +184,27 @@
       {
         "command": "repoBoard.item.remove",
         "title": "Remove from Repo Board"
+      },
+      {
+        "command": "repoBoard.getStarted",
+        "title": "Get Started (setup guide)",
+        "category": "Repo Board",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "repoBoard.setStartPage",
+        "title": "Use Repo Board as Start Page",
+        "category": "Repo Board"
+      },
+      {
+        "command": "repoBoard.unsetStartPage",
+        "title": "Stop Using Repo Board as Start Page",
+        "category": "Repo Board"
+      },
+      {
+        "command": "repoBoard.keepWelcome",
+        "title": "Keep the Welcome Page",
+        "category": "Repo Board"
       }
     ],
     "keybindings": [
@@ -214,7 +235,7 @@
     "viewsWelcome": [
       {
         "view": "repoBoard.projects",
-        "contents": "No projects yet.\n[Scan a folder for repos](command:repoBoard.addScanRoot)\n[Add current folder](command:repoBoard.addCurrent)\n[Open dashboard](command:repoBoard.open)"
+        "contents": "No projects yet.\n[Scan a folder for repos](command:repoBoard.addScanRoot)\n[Add current folder](command:repoBoard.addCurrent)\n[Open dashboard](command:repoBoard.open)\nNew here? Follow the [setup guide](command:repoBoard.getStarted)."
       }
     ],
     "menus": {
@@ -263,6 +284,11 @@
           "command": "repoBoard.pullAll",
           "when": "view == repoBoard.projects",
           "group": "2_git@2"
+        },
+        {
+          "command": "repoBoard.getStarted",
+          "when": "view == repoBoard.projects",
+          "group": "3_help@1"
         }
       ],
       "view/item/context": [
@@ -356,6 +382,18 @@
         {
           "command": "repoBoard.item.remove",
           "when": "false"
+        },
+        {
+          "command": "repoBoard.keepWelcome",
+          "when": "false"
+        },
+        {
+          "command": "repoBoard.setStartPage",
+          "when": "!config.repoBoard.showOnStartup"
+        },
+        {
+          "command": "repoBoard.unsetStartPage",
+          "when": "config.repoBoard.showOnStartup"
         }
       ]
     },
@@ -482,7 +520,94 @@
           "description": "Show the current project in the status bar (click to switch)."
         }
       }
-    }
+    },
+    "walkthroughs": [
+      {
+        "id": "repoBoard.setup",
+        "title": "Get started with Repo Board",
+        "description": "Put every git repo on your machine on one board. Takes under a minute.",
+        "steps": [
+          {
+            "id": "scan",
+            "title": "Choose the folders that hold your repos",
+            "description": "Pick one or more folders, such as C:code or ~/src. Every git repository inside them is added to the board, and repos you clone later show up by themselves.\n[Choose folders to scan](command:repoBoard.addScanRoot)\nOnly want a few repos? [Add the current folder](command:repoBoard.addCurrent) instead.",
+            "media": {
+              "image": {
+                "dark": "media/walkthrough/scan-dark.png",
+                "light": "media/walkthrough/scan-light.png",
+                "hc": "media/walkthrough/scan-dark.png",
+                "hcLight": "media/walkthrough/scan-light.png"
+              },
+              "altText": "The empty board with a Scan a folder for repos button"
+            },
+            "completionEvents": [
+              "onSettingChanged:repoBoard.scanRoots",
+              "onCommand:repoBoard.addCurrent",
+              "onCommand:repoBoard.addFolder"
+            ]
+          },
+          {
+            "id": "open",
+            "title": "See which repos need you",
+            "description": "The board shows every repo with its branch, uncommitted changes, and commits to pull or push. Click a chip such as “with changes” or “behind” to narrow it down.\n[Open the board](command:repoBoard.open)",
+            "media": {
+              "image": {
+                "dark": "media/walkthrough/board-dark.png",
+                "light": "media/walkthrough/board-light.png",
+                "hc": "media/walkthrough/board-dark.png",
+                "hcLight": "media/walkthrough/board-light.png"
+              },
+              "altText": "Repo Board showing repos with uncommitted changes"
+            },
+            "completionEvents": [
+              "onCommand:repoBoard.open"
+            ]
+          },
+          {
+            "id": "switch",
+            "title": "Jump to any repo with Ctrl+Alt+P",
+            "when": "!isMac",
+            "description": "Press Ctrl+Alt+P anywhere in VS Code and type part of a name, path, branch or #tag. Pinned repos come first, then the ones you opened most recently.\n[Try the switcher](command:repoBoard.switch)",
+            "media": {
+              "markdown": "media/walkthrough/switch.md"
+            },
+            "completionEvents": [
+              "onCommand:repoBoard.switch"
+            ]
+          },
+          {
+            "id": "switchMac",
+            "title": "Jump to any repo with ⌘⌥P",
+            "when": "isMac",
+            "description": "Press ⌘⌥P anywhere in VS Code and type part of a name, path, branch or #tag. Pinned repos come first, then the ones you opened most recently.\n[Try the switcher](command:repoBoard.switch)",
+            "media": {
+              "markdown": "media/walkthrough/switch.md"
+            },
+            "completionEvents": [
+              "onCommand:repoBoard.switch"
+            ]
+          },
+          {
+            "id": "startPage",
+            "title": "Make Repo Board your start page (optional)",
+            "description": "Open the board in every new window that starts without a folder, in place of the Welcome page. You can switch back at any time with “Repo Board: Stop Using Repo Board as Start Page”.\n[Use Repo Board as start page](command:repoBoard.setStartPage)\n[Keep the Welcome page](command:repoBoard.keepWelcome)",
+            "media": {
+              "image": {
+                "dark": "media/walkthrough/startpage-dark.png",
+                "light": "media/walkthrough/startpage-light.png",
+                "hc": "media/walkthrough/startpage-dark.png",
+                "hcLight": "media/walkthrough/startpage-light.png"
+              },
+              "altText": "Repo Board open as the first tab of a new window"
+            },
+            "completionEvents": [
+              "onSettingChanged:repoBoard.showOnStartup",
+              "onCommand:repoBoard.keepWelcome"
+            ]
+          }
+        ]
+      }
+    ]
   },
   "scripts": {
     "build": "node esbuild.mjs",

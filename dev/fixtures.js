@@ -71,7 +71,7 @@
     collections: empty ? [] : collections,
     meta: M,
     busy: params.get('still') ? [] : ['ray'],
-    settings: { openInNewWindow: false, defaultView: 'grid', defaultSort: 'recent', hasScanRoots: true, isMac: false },
+    settings: { openInNewWindow: false, defaultView: 'grid', defaultSort: 'recent', hasScanRoots: true, startPage: false, isMac: false },
     canAddCurrent: false,
     scanning: false,
     gitAvailable: true,

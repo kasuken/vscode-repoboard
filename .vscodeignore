@@ -3,6 +3,7 @@
 !media/icon.png
 !media/activity.svg
 !media/dashboard.css
+!media/walkthrough/**
 !package.json
 !README.md
 !CHANGELOG.md

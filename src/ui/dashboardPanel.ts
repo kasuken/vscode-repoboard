@@ -97,7 +97,7 @@ export class DashboardPanel implements vscode.Disposable {
       collections: catalog.collections,
       meta,
       busy,
-      settings: { openInNewWindow: s.openInNewWindow, defaultView: s.defaultView, defaultSort: s.defaultSort, hasScanRoots: s.scanRoots.length > 0, isMac: process.platform === 'darwin' },
+      settings: { openInNewWindow: s.openInNewWindow, defaultView: s.defaultView, defaultSort: s.defaultSort, hasScanRoots: s.scanRoots.length > 0, startPage: s.showOnStartup, isMac: process.platform === 'darwin' },
       canAddCurrent: !!current && !this.app.projects.byPath(current),
       scanning: this.app.isScanning,
       gitAvailable: this.app.git.available,
@@ -205,6 +205,12 @@ export class DashboardPanel implements vscode.Disposable {
         return;
       case 'pullAll':
         await app.bulk('pull');
+        return;
+      case 'getStarted':
+        await vscode.commands.executeCommand('repoBoard.getStarted');
+        return;
+      case 'startPage':
+        await vscode.commands.executeCommand(m.on ? 'repoBoard.setStartPage' : 'repoBoard.unsetStartPage');
         return;
       case 'openSettings':
         await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:' + app.context.extension.id);
