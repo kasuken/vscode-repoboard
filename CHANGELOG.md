@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.1
+
+- Fixed a repo listing itself among its own worktrees when it is reached through a symlink, a Windows short (8.3)
+  path or a `subst` drive, and on macOS temporary folders.
+
 ## 1.2.0
 
 - **Worktrees stay with their repo.** Linked `git worktree` folders, such as the ones coding agents create, are no
