@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.3
+
+- Documentation updates.
+
 ## 1.1.2
 
 - Choosing folders to scan now opens the board and shows the scan in progress. The result is always reported:

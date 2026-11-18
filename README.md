@@ -10,13 +10,6 @@
 </p>
 
 <p align="center">
-  <a href="https://marketplace.visualstudio.com/items?itemName=emanuelebartolesi.vscode-repoboard"><img src="https://img.shields.io/visual-studio-marketplace/v/emanuelebartolesi.vscode-repoboard?label=Marketplace&color=0e639c" alt="Marketplace version"></a>
-  <a href="https://marketplace.visualstudio.com/items?itemName=emanuelebartolesi.vscode-repoboard"><img src="https://img.shields.io/visual-studio-marketplace/i/emanuelebartolesi.vscode-repoboard?color=3fb950" alt="Installs"></a>
-  <a href="https://marketplace.visualstudio.com/items?itemName=emanuelebartolesi.vscode-repoboard&ssr=false#review-details"><img src="https://img.shields.io/visual-studio-marketplace/r/emanuelebartolesi.vscode-repoboard?color=e3b341" alt="Rating"></a>
-  <a href="https://github.com/kasuken/vscode-repoboard/blob/main/LICENSE"><img src="https://img.shields.io/github/license/kasuken/vscode-repoboard?color=768390" alt="MIT license"></a>
-</p>
-
-<p align="center">
   <a href="https://marketplace.visualstudio.com/items?itemName=emanuelebartolesi.vscode-repoboard"><b>Install from the Marketplace</b></a>
   &nbsp;·&nbsp;
   <a href="#quick-start">Quick start</a>
