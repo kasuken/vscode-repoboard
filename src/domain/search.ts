@@ -60,6 +60,8 @@ export interface SearchFields {
   branch?: string | undefined;
   languages: readonly string[];
   collection?: string | undefined;
+  /** Branches checked out in linked worktrees, so an agent's branch finds its repo. */
+  worktreeBranches?: readonly string[];
 }
 
 export function fieldsOf(project: Project, meta: ProjectMeta | undefined, collectionName?: string): SearchFields {
@@ -71,6 +73,7 @@ export function fieldsOf(project: Project, meta: ProjectMeta | undefined, collec
     branch: meta?.git?.branch,
     languages: meta?.languages.map((l) => l.name) ?? [],
     collection: collectionName,
+    worktreeBranches: meta?.git?.worktrees?.map((w) => w.branch) ?? [],
   };
 }
 
@@ -102,6 +105,7 @@ export function matchScore(query: string, fields: SearchFields): number {
       substringOnly(token, fields.branch ?? ''),
       ...fields.languages.map((l) => substringOnly(token, l)),
       substringOnly(token, fields.collection ?? ''),
+      ...(fields.worktreeBranches ?? []).map((b) => substringOnly(token, b) / 2),
     );
     if (best <= 0) {
       return 0;

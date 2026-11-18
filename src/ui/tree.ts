@@ -1,11 +1,14 @@
 import * as os from 'node:os';
 import * as vscode from 'vscode';
 import { App, settings } from '../app';
-import { Collection, Project, changedFiles } from '../domain/model';
+import { Collection, Project, WorktreeInfo, changedFiles } from '../domain/model';
 import { displayPath, pathKey } from '../domain/paths';
 import { relativeTime, sortProjects } from '../domain/search';
 
-type Node = { kind: 'group'; id: string; label: string; icon: string; color?: string | undefined; projects: Project[] } | { kind: 'project'; project: Project };
+type Node =
+  | { kind: 'group'; id: string; label: string; icon: string; color?: string | undefined; projects: Project[] }
+  | { kind: 'project'; project: Project }
+  | { kind: 'worktree'; project: Project; worktree: WorktreeInfo };
 
 /** Sidebar tree: Pinned, then each collection, then ungrouped — with branch and status inline. */
 export class ProjectTree implements vscode.TreeDataProvider<Node>, vscode.Disposable {
@@ -28,6 +31,10 @@ export class ProjectTree implements vscode.TreeDataProvider<Node>, vscode.Dispos
   async getChildren(node?: Node): Promise<Node[]> {
     if (node?.kind === 'group') {
       return node.projects.map((project) => ({ kind: 'project', project }));
+    }
+    if (node?.kind === 'project') {
+      const trees = this.app.meta.get(node.project.path)?.git?.worktrees ?? [];
+      return trees.map((worktree) => ({ kind: 'worktree', project: node.project, worktree }));
     }
     if (node) {
       return [];
@@ -73,7 +80,11 @@ export class ProjectTree implements vscode.TreeDataProvider<Node>, vscode.Dispos
     const p = node.project;
     const m = this.app.meta.get(p.path);
     const git = m?.git;
-    const item = new vscode.TreeItem(p.name, vscode.TreeItemCollapsibleState.None);
+    if (node.kind === 'worktree') {
+      return worktreeItem(node.project, node.worktree);
+    }
+    const trees = this.app.meta.get(p.path)?.git?.worktrees ?? [];
+    const item = new vscode.TreeItem(p.name, trees.length ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
     item.id = `project:${pathKey(p.path)}`;
     const bits: string[] = [];
     if (git) {
@@ -109,6 +120,7 @@ export class ProjectTree implements vscode.TreeDataProvider<Node>, vscode.Dispos
       ].filter(Boolean);
       if (parts.length) tip.appendMarkdown(`$(diff) ${parts.join(', ')}  \n`);
       if (git.error) tip.appendMarkdown(`$(warning) ${escapeMd(git.error)}  \n`);
+      if (git.worktrees?.length) tip.appendMarkdown(`$(repo-forked) ${git.worktrees.length} linked worktree${git.worktrees.length === 1 ? '' : 's'}  \n`);
     }
     if (p.tags.length) tip.appendMarkdown(`\n${p.tags.map((t) => `\`#${escapeMd(t)}\``).join(' ')}`);
     item.tooltip = tip;
@@ -123,6 +135,29 @@ export class ProjectTree implements vscode.TreeDataProvider<Node>, vscode.Dispos
     this.app.meta.off('update', this.onMeta);
     this.emitter.dispose();
   }
+}
+
+/** A linked worktree under its main repo. Clicking opens it; the inline button opens a new window. */
+function worktreeItem(project: Project, wt: WorktreeInfo): vscode.TreeItem {
+  const item = new vscode.TreeItem(wt.branch, vscode.TreeItemCollapsibleState.None);
+  item.id = `worktree:${pathKey(wt.path)}`;
+  item.description = wt.prunable ? 'folder gone' : wt.changes ? `●${wt.changes}` : '';
+  item.iconPath = new vscode.ThemeIcon(wt.prunable ? 'warning' : 'repo-forked', wt.changes ? new vscode.ThemeColor('gitDecoration.modifiedResourceForeground') : undefined);
+  item.tooltip = `${wt.path}
+Worktree of ${project.name}${wt.locked ? ' (locked)' : ''}`;
+  item.contextValue = 'worktree';
+  item.command = { command: 'repoBoard.worktree.open', title: 'Open', arguments: [{ kind: 'worktree', project, worktree: wt }] };
+  return item;
+}
+
+/** Resolves the worktree a tree command was invoked on. */
+export function worktreeArg(app: App, arg: unknown): { project: Project; path: string } | undefined {
+  const node = arg as Node | undefined;
+  if (node && typeof node === 'object' && node.kind === 'worktree') {
+    const project = app.projects.byId(node.project.id);
+    return project ? { project, path: node.worktree.path } : undefined;
+  }
+  return undefined;
 }
 
 function groupFor(c: Collection, projects: Project[]): Node {

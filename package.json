@@ -2,7 +2,7 @@
   "name": "vscode-repoboard",
   "displayName": "Repo Board",
   "description": "All your git repos on one board: auto-discovers every repo on disk, shows which ones are dirty, behind or ahead at a glance, and switches between them with Ctrl+Alt+P. Fetch or pull them all in one click.",
-  "version": "1.1.3",
+  "version": "1.2.0",
   "publisher": "emanuelebartolesi",
   "author": {
     "name": "Emanuele Bartolesi",
@@ -193,6 +193,25 @@
         "command": "repoBoard.keepWelcome",
         "title": "Keep the Welcome Page",
         "category": "Repo Board"
+      },
+      {
+        "command": "repoBoard.worktree.open",
+        "title": "Open Worktree",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "repoBoard.worktree.openNewWindow",
+        "title": "Open Worktree in New Window",
+        "icon": "$(empty-window)"
+      },
+      {
+        "command": "repoBoard.worktree.terminal",
+        "title": "Open Terminal in Worktree",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "repoBoard.worktree.reveal",
+        "title": "Reveal Worktree in File Explorer"
       }
     ],
     "keybindings": [
@@ -324,6 +343,31 @@
           "command": "repoBoard.item.remove",
           "when": "view == repoBoard.projects && viewItem =~ /^project/",
           "group": "2_manage@9"
+        },
+        {
+          "command": "repoBoard.worktree.openNewWindow",
+          "when": "view == repoBoard.projects && viewItem == worktree",
+          "group": "inline@1"
+        },
+        {
+          "command": "repoBoard.worktree.open",
+          "when": "view == repoBoard.projects && viewItem == worktree",
+          "group": "1_open@1"
+        },
+        {
+          "command": "repoBoard.worktree.openNewWindow",
+          "when": "view == repoBoard.projects && viewItem == worktree",
+          "group": "1_open@2"
+        },
+        {
+          "command": "repoBoard.worktree.terminal",
+          "when": "view == repoBoard.projects && viewItem == worktree",
+          "group": "1_open@3"
+        },
+        {
+          "command": "repoBoard.worktree.reveal",
+          "when": "view == repoBoard.projects && viewItem == worktree",
+          "group": "1_open@4"
         }
       ],
       "editor/title": [
@@ -382,6 +426,22 @@
         {
           "command": "repoBoard.unsetStartPage",
           "when": "config.repoBoard.showOnStartup"
+        },
+        {
+          "command": "repoBoard.worktree.open",
+          "when": "false"
+        },
+        {
+          "command": "repoBoard.worktree.openNewWindow",
+          "when": "false"
+        },
+        {
+          "command": "repoBoard.worktree.terminal",
+          "when": "false"
+        },
+        {
+          "command": "repoBoard.worktree.reveal",
+          "when": "false"
         }
       ]
     },
@@ -441,6 +501,19 @@
             "coverage"
           ],
           "description": "Folder names skipped by repo discovery and language detection."
+        },
+        "repoBoard.worktrees": {
+          "type": "string",
+          "enum": [
+            "nested",
+            "separate"
+          ],
+          "enumDescriptions": [
+            "Show linked git worktrees inside their main repo’s tile (badge, menu and sidebar children)",
+            "Show every linked worktree as a project of its own"
+          ],
+          "default": "nested",
+          "markdownDescription": "How linked `git worktree` folders appear. `nested` keeps them under their main repo, so agent and feature worktrees don’t crowd the board."
         },
         "repoBoard.openInNewWindow": {
           "type": "boolean",

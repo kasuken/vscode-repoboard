@@ -1,11 +1,11 @@
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { markOpened, mergeDiscovered, removeProject, togglePin } from './domain/catalog';
-import { Project, SortMode, ViewMode, changedFiles } from './domain/model';
+import { dropNestedWorktrees, groupWorktrees, markOpened, mergeDiscovered, removeProject, togglePin } from './domain/catalog';
+import { Project, SortMode, ViewMode, WorktreeMode, changedFiles } from './domain/model';
 import { expandHome, folderOf, pathKey } from './domain/paths';
 import { discoverRepos } from './services/discovery';
-import { GitClient, RemoteOp } from './services/git';
+import { GitClient, RemoteOp, worktreeMainOf } from './services/git';
 import { Limiter, MetadataService } from './services/metadata';
 import { ProjectService } from './services/projectService';
 import { CatalogStore, sharedDataDir } from './storage/catalogStore';
@@ -28,6 +28,7 @@ export function settings() {
     detectLanguages: c.get<boolean>('detectLanguages', true),
     maxFilesScanned: Math.max(100, c.get<number>('maxFilesScanned', 10000)),
     statusBar: c.get<boolean>('statusBar', true),
+    worktrees: c.get<WorktreeMode>('worktrees', 'nested'),
   };
 }
 
@@ -118,6 +119,30 @@ export class App implements vscode.Disposable {
     }
     await this.projects.update((c) => markOpened(c, project.id));
     await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(project.path), { forceNewWindow: newWindow });
+  }
+
+  /**
+   * Opens one of a project's linked worktrees. Only paths git reported for that project are accepted,
+   * so the webview can never make the host open an arbitrary folder.
+   */
+  async openWorktree(project: Project, worktreePath: string, action: 'open' | 'newWindow' | 'terminal' | 'reveal'): Promise<void> {
+    const wt = this.meta.get(project.path)?.git?.worktrees?.find((w) => pathKey(w.path) === pathKey(worktreePath));
+    if (!wt) {
+      return;
+    }
+    if (wt.prunable) {
+      void this.ui.info(`The worktree folder ${wt.path} no longer exists. Run "git worktree prune" in ${project.name} to clean it up.`);
+      return;
+    }
+    const uri = vscode.Uri.file(wt.path);
+    if (action === 'terminal') {
+      vscode.window.createTerminal({ name: `${project.name} · ${wt.branch}`, cwd: wt.path }).show();
+    } else if (action === 'reveal') {
+      void vscode.commands.executeCommand('revealFileInOS', uri);
+    } else {
+      const newWindow = action === 'newWindow' ? true : settings().openInNewWindow;
+      await vscode.commands.executeCommand('vscode.openFolder', uri, { forceNewWindow: newWindow });
+    }
   }
 
   terminal(project: Project): void {
@@ -215,15 +240,26 @@ export class App implements vscode.Disposable {
     try {
       await this.projects.ensureLoaded();
       const run = () => discoverRepos(s.scanRoots, { maxDepth: s.scanDepth, ignoreDirs: s.ignoreDirs });
-      const found = options.notify
+      const discovered = options.notify
         ? await this.ui.progress({ location: vscode.ProgressLocation.Notification, title: `Scanning ${describeRoots(s.scanRoots)} for git repos…` }, run)
         : await run();
+      // Linked worktrees belong to their main repo; they only get a tile of their own in `separate` mode.
+      const nested = s.worktrees === 'nested';
+      const mainOf = nested ? await worktreeParents([...discovered, ...this.projects.projects.map((p) => p.path)]) : new Map<string, string>();
+      const { repos: found, grouped } = nested ? groupWorktrees(this.projects.current, discovered, mainOf) : { repos: discovered, grouped: [] as string[] };
       let added: Project[] = [];
+      let dropped = 0;
       await this.projects.update((c) => {
         const result = mergeDiscovered(c, found);
         added = result.added;
-        return result.catalog;
+        if (!nested) return result.catalog;
+        const cleaned = dropNestedWorktrees(result.catalog, new Map([...mainOf].map(([k, v]) => [pathKey(k), v])));
+        dropped = cleaned.dropped;
+        return cleaned.catalog;
       });
+      if (grouped.length || dropped) {
+        this.log.appendLine(`[scan] ${grouped.length} worktrees shown under their main repo${dropped ? `; ${dropped} worktree tiles removed` : ''}`);
+      }
       const ignored = new Set(this.projects.current.ignoredPaths);
       const skipped = found.filter((p) => ignored.has(pathKey(p))).length;
       this.log.appendLine(`[scan] ${found.length} repos under ${s.scanRoots.join(', ')}; ${added.length} new; ${skipped} skipped (removed earlier)`);
@@ -392,4 +428,19 @@ function isInside(child: string, root: string): boolean {
   const c = pathKey(child);
   const r = pathKey(root);
   return c === r || c.startsWith(r.endsWith(path.sep) ? r : r + path.sep);
+}
+
+/** Maps each folder that is a linked worktree to its main repo's folder (one small file read each). */
+async function worktreeParents(folders: readonly string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const limiter = new Limiter(16);
+  await Promise.all(
+    [...new Set(folders)].map((f) =>
+      limiter.run(async () => {
+        const main = await worktreeMainOf(f);
+        if (main) map.set(f, main);
+      }),
+    ),
+  );
+  return map;
 }

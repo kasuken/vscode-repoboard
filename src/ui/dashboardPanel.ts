@@ -206,6 +206,9 @@ export class DashboardPanel implements vscode.Disposable {
       case 'pullAll':
         await app.bulk('pull');
         return;
+      case 'worktree':
+        if (project) await app.openWorktree(project, m.path, m.action);
+        return;
       case 'getStarted':
         await vscode.commands.executeCommand('repoBoard.getStarted');
         return;

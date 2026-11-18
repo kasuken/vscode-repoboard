@@ -159,3 +159,71 @@ export function describeGitError(stderr: string): string | undefined {
   const first = stderr.split(/\r?\n/).find((l) => l.trim());
   return first?.replace(/^(fatal|error):\s*/i, '').slice(0, 200);
 }
+
+export interface ParsedWorktree {
+  path: string;
+  branch: string;
+  detached: boolean;
+  bare: boolean;
+  prunable: boolean;
+  locked: boolean;
+}
+
+/**
+ * Parses `git worktree list --porcelain`. The first entry is the main working tree.
+ * Paths are converted to the platform's separators by the caller if needed.
+ */
+export function parseWorktreeList(output: string): ParsedWorktree[] {
+  const trees: ParsedWorktree[] = [];
+  let current: ParsedWorktree | undefined;
+  let head = '';
+  const finish = () => {
+    if (current) {
+      if (current.detached) current.branch = head ? head.slice(0, 7) : 'HEAD';
+      trees.push(current);
+    }
+    current = undefined;
+    head = '';
+  };
+  for (const line of output.split(/\r?\n/)) {
+    if (line.startsWith('worktree ')) {
+      finish();
+      current = { path: line.slice(9).trim(), branch: '', detached: false, bare: false, prunable: false, locked: false };
+    } else if (!current) {
+      continue;
+    } else if (line.startsWith('HEAD ')) {
+      head = line.slice(5).trim();
+    } else if (line.startsWith('branch ')) {
+      current.branch = line.slice(7).trim().replace(/^refs\/heads\//, '');
+    } else if (line === 'detached') {
+      current.detached = true;
+    } else if (line === 'bare') {
+      current.bare = true;
+    } else if (line === 'prunable' || line.startsWith('prunable ')) {
+      current.prunable = true;
+    } else if (line === 'locked' || line.startsWith('locked ')) {
+      current.locked = true;
+    }
+  }
+  finish();
+  return trees;
+}
+
+/**
+ * Given the contents of a `.git` *file* and the folder it lives in, returns the main repository's
+ * folder when it is a linked worktree (`gitdir: <main>/.git/worktrees/<name>`), else undefined
+ * (submodules point at `.git/modules/...` and are not worktrees).
+ */
+export function worktreeMainFromGitFile(contents: string, folder: string, resolve: (from: string, to: string) => string): string | undefined {
+  const m = contents.match(/^gitdir:\s*(.+)$/m);
+  if (!m) return undefined;
+  const gitdir = resolve(folder, m[1]!.trim());
+  const parts = gitdir.split(/[\\/]+/);
+  const i = parts.lastIndexOf('worktrees');
+  if (i < 1 || i !== parts.length - 2) return undefined;
+  const commonDir = parts.slice(0, i);
+  // <main>/.git/worktrees/x → <main>; a bare repo <repo.git>/worktrees/x → <repo.git>.
+  const main = commonDir[commonDir.length - 1]!.toLowerCase() === '.git' ? commonDir.slice(0, -1) : commonDir;
+  const joined = main.join(gitdir.includes('\\') ? '\\' : '/');
+  return joined || undefined;
+}

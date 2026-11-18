@@ -73,6 +73,18 @@ Add one or more **scan folders**, and Repo Board walks them (three levels deep b
 never follows symlinks or junctions, and skips `node_modules` and friends. Repos you remove from the board stay
 removed, even if they are still on disk.
 
+### Worktrees stay with their repo
+
+Linked `git worktree` folders, such as the ones coding agents create for each task, don't crowd the board.
+They appear as a badge on their main repo's tile. The badge turns yellow when one of them has uncommitted
+work. Click it to see each worktree's branch and change count, then open it, open a terminal there or reveal
+it. Worktrees whose folder is gone are flagged. In the sidebar they show as children of their repo, and
+searching for a worktree's branch finds its repo.
+
+![A repo tile with its worktrees listed](images/worktrees.png)
+
+Prefer every worktree as a project of its own? Set `repoBoard.worktrees` to `separate`.
+
 ### A switcher that knows your repos
 
 Press <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>P</kbd> (<kbd>Cmd</kbd>+<kbd>Alt</kbd>+<kbd>P</kbd> on macOS) anywhere in
@@ -188,6 +200,7 @@ The switcher keybinding is `repoBoard.switch`, so you can rebind it in **Keyboar
 | `repoBoard.scanRoots` | `[]` | Folders scanned for git repositories. `~` works. Kept per machine, never synced. |
 | `repoBoard.scanDepth` | `3` | Folder levels searched below each scan folder (1–8) |
 | `repoBoard.autoScan` | `true` | Re-scan when the dashboard opens, at most every 10 minutes |
+| `repoBoard.worktrees` | `nested` | `nested` shows linked worktrees inside their main repo; `separate` gives each its own tile |
 | `repoBoard.ignoreDirs` | `node_modules`, `bin`, `obj`, `dist`, … | Folder names skipped by discovery and language detection |
 | `repoBoard.openInNewWindow` | `false` | Open projects in a new window by default |
 | `repoBoard.showOnStartup` | `false` | Open the dashboard in windows that start without a folder |

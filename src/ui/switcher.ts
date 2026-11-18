@@ -44,6 +44,7 @@ export async function showSwitcher(app: App): Promise<void> {
         if (changes) bits.push(`$(diff) ${changes}`);
         if (git.behind) bits.push(`$(arrow-down)${git.behind}`);
         if (git.ahead) bits.push(`$(arrow-up)${git.ahead}`);
+        if (git.worktrees?.length) bits.push(`$(repo-forked) ${git.worktrees.length} worktree${git.worktrees.length === 1 ? '' : 's'}`);
       }
       if (m?.availability === 'missing') bits.push('$(warning) folder missing');
       if (m?.availability === 'offline') bits.push('$(debug-disconnect) drive not connected');

@@ -49,7 +49,11 @@
   const c = (subject, seconds) => ({ hash: Math.random().toString(16).slice(2, 9), subject, author: 'you', time: ago(seconds) });
   const meta = (g, languages, extra = {}) => ({ availability: 'ok', git: g, languages, updatedAt: now, languagesAt: now, ...extra });
   const M = {
-    storefront: meta(git({ modified: 3, untracked: 1, lastCommit: c('Cache product pages at the edge', 1 * H) }), lang([L.TS, 78.4], [L.CSS, 14.1], [L.HTML, 7.5])),
+    storefront: meta(git({ modified: 3, untracked: 1, lastCommit: c('Cache product pages at the edge', 1 * H), worktrees: [
+      { path: 'C:/code/worktrees/storefront/agent-fix-checkout-total', branch: 'agent/fix-checkout-total', detached: false, changes: 6, prunable: false, locked: false },
+      { path: 'C:/code/worktrees/storefront/agent-a11y-audit', branch: 'agent/a11y-audit', detached: false, changes: 0, prunable: false, locked: false },
+      { path: 'C:/code/worktrees/storefront/review-pr-412', branch: 'review/pr-412', detached: false, changes: 0, prunable: true, locked: false },
+    ] }), lang([L.TS, 78.4], [L.CSS, 14.1], [L.HTML, 7.5])),
     design: meta(git({ ahead: 2, lastCommit: c('Add Toast and Popover components', 4 * H) }), lang([L.TS, 61.2], [L.SCSS, 32.3], [L.HTML, 6.5])),
     payments: meta(git({ behind: 4, lastCommit: c('Retry webhooks with exponential backoff', 1 * D), webUrl: 'https://dev.azure.com/acme/commerce/_git/payments-api' }), lang([L.CS, 88.6], [L.BICEP, 11.4])),
     checkout: meta(git({ branch: 'feature/apple-pay', upstream: 'origin/feature/apple-pay', staged: 2, modified: 5, ahead: 1, behind: 2, stashes: 1, lastCommit: c('WIP: Apple Pay sheet', 2 * D) }), lang([L.VUE, 54], [L.TS, 39], [L.CSS, 7])),
@@ -85,7 +89,7 @@
     ...(params.get('tag') ? { tag: params.get('tag') } : {}),
     ...(params.get('focus') ? { focusedId: params.get('focus') } : {}),
   };
-  if (params.get('menu')) {
+  if (params.get('menu') || params.get('wtmenu')) {
     // Headless capture blurs the iframe, which would close the menu before the screenshot.
     const add = window.addEventListener.bind(window);
     window.addEventListener = (type, ...rest) => (type === 'blur' || type === 'resize' ? undefined : add(type, ...rest));
@@ -117,6 +121,7 @@
       if (params.get('help')) document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '?', bubbles: true }));
     }, 60);
     setTimeout(() => {
+      if (params.get('wtmenu')) document.querySelector(`article.tile[data-id="${params.get('wtmenu')}"] .b-wt`)?.click();
       if (params.get('menu')) {
         const tile = document.querySelector(`article.tile[data-id="${params.get('menu')}"]`);
         const r = tile.getBoundingClientRect();

@@ -277,3 +277,39 @@ function withOptional<T extends object, K extends keyof T>(obj: T, key: K, value
   }
   return copy;
 }
+
+/**
+ * Splits discovered folders into repos to add and linked worktrees to fold into their main repo.
+ * A worktree stays a repo of its own only when its main repo is neither on the board nor found now.
+ * `mainOf` maps a worktree folder to its main repo's folder.
+ */
+export function groupWorktrees(
+  catalog: Catalog,
+  found: readonly string[],
+  mainOf: ReadonlyMap<string, string>,
+): { repos: string[]; grouped: string[] } {
+  const present = new Set([...catalog.projects.map((p) => pathKey(p.path)), ...found.filter((f) => !mainOf.has(f)).map((f) => pathKey(f))]);
+  const repos: string[] = [];
+  const grouped: string[] = [];
+  for (const f of found) {
+    const main = mainOf.get(f);
+    (main && present.has(pathKey(main)) ? grouped : repos).push(f);
+  }
+  return { repos, grouped };
+}
+
+/**
+ * Removes worktree tiles that discovery added earlier and whose main repo is on the board now.
+ * They are not added to `ignoredPaths`: switching `repoBoard.worktrees` to `separate` brings them back.
+ * Projects the user added by hand are always kept.
+ */
+export function dropNestedWorktrees(catalog: Catalog, mainOf: ReadonlyMap<string, string>): { catalog: Catalog; dropped: number } {
+  const onBoard = new Set(catalog.projects.map((p) => pathKey(p.path)));
+  const keep = catalog.projects.filter((p) => {
+    if (p.source !== 'discovered') return true;
+    const main = mainOf.get(pathKey(p.path));
+    return !(main && onBoard.has(pathKey(main)));
+  });
+  const dropped = catalog.projects.length - keep.length;
+  return dropped ? { catalog: { ...catalog, projects: keep }, dropped } : { catalog, dropped: 0 };
+}

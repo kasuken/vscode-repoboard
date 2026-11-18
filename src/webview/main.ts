@@ -428,7 +428,7 @@ function avatar(p: ProjectView, meta: ProjectMeta | undefined): HTMLElement {
   return h('span', { class: `avatar${p.icon ? ' emoji' : ''}`, 'aria-hidden': 'true', style: color ? { '--accent': color } : {}, text: p.icon || initialsFor(p.name) });
 }
 
-function gitLine(git: GitStatus, compact = false): HTMLElement {
+function gitLine(git: GitStatus, compact = false, project?: ProjectView): HTMLElement {
   const changes = changedFiles(git);
   const parts: Child[] = [
     h('span', { class: 'branch', title: git.upstream ? `${git.branch} → ${git.upstream}` : `${git.branch} (no upstream)` }, icon(git.detached ? 'git-commit' : 'git-branch'), h('span', { text: git.branch })),
@@ -441,6 +441,27 @@ function gitLine(git: GitStatus, compact = false): HTMLElement {
   if (git.behind) parts.push(h('span', { class: 'badge b-behind', title: `${git.behind} commit(s) to pull from ${git.upstream}` }, icon('arrow-down'), String(git.behind)));
   if (git.ahead) parts.push(h('span', { class: 'badge b-ahead', title: `${git.ahead} commit(s) to push to ${git.upstream}` }, icon('arrow-up'), String(git.ahead)));
   if (git.stashes) parts.push(h('span', { class: 'badge b-stash', title: `${git.stashes} stash entr${git.stashes === 1 ? 'y' : 'ies'}` }, icon('archive'), String(git.stashes)));
+  const trees = git.worktrees ?? [];
+  if (trees.length && project) {
+    const dirty = trees.filter((w) => (w.changes ?? 0) > 0).length;
+    parts.push(
+      h(
+        'button',
+        {
+          type: 'button',
+          class: `badge b-wt${dirty ? ' has-changes' : ''}`,
+          title: `${trees.length} linked worktree${trees.length === 1 ? '' : 's'}${dirty ? `, ${dirty} with changes` : ''}. Click to open one.`,
+          'aria-label': `${trees.length} worktrees of ${project.name}`,
+          onclick: (e: MouseEvent) => {
+            e.stopPropagation();
+            openWorktreeMenu(project, e.currentTarget as HTMLElement);
+          },
+        },
+        icon('repo-forked'),
+        compact ? String(trees.length) : `${trees.length} worktree${trees.length === 1 ? '' : 's'}`,
+      ),
+    );
+  }
   if (!changes && !git.behind && !git.ahead && !git.conflicts && git.upstream && !compact) {
     parts.push(h('span', { class: 'badge b-clean', title: `In sync with ${git.upstream}${git.fetchedAt ? `, fetched ${relativeTime(git.fetchedAt)}` : ''}` }, icon('check'), 'in sync'));
   }
@@ -496,7 +517,7 @@ function tile(p: ProjectView): HTMLElement {
   }
   if (git?.error) body.push(h('div', { class: 'notice n-missing', title: git.error }, icon('warning'), git.error));
   if (git && !git.error) {
-    body.push(gitLine(git));
+    body.push(gitLine(git, false, p));
     if (git.lastCommit) {
       body.push(
         h(
@@ -583,7 +604,7 @@ function row(p: ProjectView): HTMLElement {
     avatar(p, meta),
     h('div', { class: 'row-name' }, h('span', { class: 'name', text: p.name }), p.isCurrent ? h('span', { class: 'here', text: 'open here' }) : null, h('span', { class: 'path', text: p.displayPath, title: p.path })),
     git && !git.error && st !== 'missing' && st !== 'offline'
-      ? gitLine(git, true)
+      ? gitLine(git, true, p)
       : h('span', { class: `muted small${st === 'missing' ? ' n-missing' : ''}`, text: git?.error ?? (st === 'nogit' ? 'no git' : STATE_LABEL[st]) }),
     h('span', { class: 'when', text: git?.lastCommit ? relativeTime(git.lastCommit.time * 1000) : '' }),
     h('span', { class: 'row-lang', text: meta?.languages[0]?.name ?? '' }),
@@ -835,6 +856,10 @@ interface MenuItem {
   run: () => void;
   danger?: boolean;
   hint?: string;
+  /** Run instead of `run` on Ctrl/Cmd+click or Ctrl/Cmd+Enter. */
+  alt?: () => void;
+  /** Tooltip, e.g. a full path. */
+  title?: string;
 }
 
 let openMenuEl: HTMLElement | undefined;
@@ -859,9 +884,10 @@ function showMenu(anchor: HTMLElement, items: Array<MenuItem | 'sep'>, at?: Mous
         type: 'button',
         role: 'menuitem',
         class: `menu-item${item.danger ? ' danger' : ''}`,
-        onclick: () => {
+        title: item.title,
+        onclick: (e: MouseEvent) => {
           closeMenu();
-          item.run();
+          (item.alt && (e.ctrlKey || e.metaKey) ? item.alt : item.run)();
           anchor.focus();
         },
       },
@@ -932,6 +958,37 @@ function openTileMenu(p: ProjectView, anchor: HTMLElement, at?: MouseEvent): voi
     ],
     at,
   );
+}
+
+/** Lists a repo's linked worktrees; picking one opens it (Ctrl/Cmd+click: the other window). */
+function openWorktreeMenu(p: ProjectView, anchor: HTMLElement): void {
+  const trees = board!.meta[p.id]?.git?.worktrees ?? [];
+  const home = p.path.length ? p.path : '';
+  const items: Array<MenuItem | 'sep'> = trees.map((w) => ({
+    label: w.branch + (w.prunable ? ' (folder gone)' : ''),
+    icon: w.prunable ? 'warning' : w.detached ? 'git-commit' : 'git-branch',
+    hint: w.changes ? `●${w.changes}` : shortPath(w.path, home),
+    run: () => send({ type: 'worktree', id: p.id, path: w.path, action: 'open' }),
+    alt: () => send({ type: 'worktree', id: p.id, path: w.path, action: 'newWindow' }),
+    title: w.path,
+  }));
+  if (trees.length) {
+    items.push('sep');
+    items.push({ label: 'Open a terminal in…', icon: 'terminal', run: () => openWorktreeSubmenu(p, anchor, 'terminal') });
+    items.push({ label: 'Reveal in file explorer…', icon: 'folder', run: () => openWorktreeSubmenu(p, anchor, 'reveal') });
+  }
+  showMenu(anchor, items);
+}
+
+function openWorktreeSubmenu(p: ProjectView, anchor: HTMLElement, action: 'terminal' | 'reveal'): void {
+  const trees = (board!.meta[p.id]?.git?.worktrees ?? []).filter((w) => !w.prunable);
+  showMenu(anchor, trees.map((w) => ({ label: w.branch, icon: action === 'terminal' ? 'terminal' : 'folder', title: w.path, run: () => send({ type: 'worktree', id: p.id, path: w.path, action }) })));
+}
+
+/** The part of a worktree path that differs from its main repo, for menu hints. */
+function shortPath(full: string, main: string): string {
+  const parts = full.split(/[\/]/);
+  return parts.slice(-2).join('/') || main;
 }
 
 function openAddMenu(anchor: HTMLElement): void {

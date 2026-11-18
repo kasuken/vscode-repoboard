@@ -504,3 +504,8 @@ body.vscode-light .chip.tag { border-color: hsl(var(--hue) 45% 45% / .4); }
 .empty-guide { margin-top: 18px !important; font-size: 12px; }
 .link { border: 0; padding: 0; background: none; color: var(--link); cursor: pointer; font: inherit; }
 .link:hover { text-decoration: underline; }
+
+/* Worktree badge: a button, since it opens the repo's worktree list. */
+.badge.b-wt { border: 1px solid var(--border); border-radius: 10px; padding: 0 7px; height: 18px; background: transparent; color: var(--muted); font: inherit; font-size: 11.5px; font-weight: 500; cursor: pointer; }
+.badge.b-wt:hover { color: var(--fg); border-color: color-mix(in srgb, var(--fg) 35%, var(--border)); }
+.badge.b-wt.has-changes { color: var(--st-dirty); border-color: color-mix(in srgb, var(--st-dirty) 45%, var(--border)); }

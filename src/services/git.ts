@@ -1,8 +1,9 @@
 import { execFile } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import { LOG_FORMAT, describeGitError, parseLogLine, parsePorcelainV2, pickRemoteUrl, remoteToWebUrl } from '../domain/gitParse';
-import { GitStatus } from '../domain/model';
+import { LOG_FORMAT, describeGitError, parseLogLine, parsePorcelainV2, parseWorktreeList, pickRemoteUrl, remoteToWebUrl, worktreeMainFromGitFile } from '../domain/gitParse';
+import { GitStatus, WorktreeInfo } from '../domain/model';
+import { pathKey } from '../domain/paths';
 
 export type RemoteOp = 'fetch' | 'pull' | 'push';
 
@@ -39,6 +40,20 @@ function run(cwd: string, args: string[], timeout: number, env = NON_INTERACTIVE
       resolve({ ok: !error, stdout: stdout ?? '', stderr: stderr ?? (error?.message || ''), ...(missingGit ? { missingGit } : {}) });
     });
   });
+}
+
+/**
+ * When `folder` is a linked worktree, returns its main repository's folder. One small file read;
+ * undefined for normal repos, submodules and non-repos.
+ */
+export async function worktreeMainOf(folder: string): Promise<string | undefined> {
+  try {
+    const gitPath = path.join(folder, '.git');
+    if (!(await fs.lstat(gitPath)).isFile()) return undefined;
+    return worktreeMainFromGitFile(await fs.readFile(gitPath, 'utf8'), folder, (from, to) => path.resolve(from, to));
+  } catch {
+    return undefined;
+  }
 }
 
 /** True when `folder` has a `.git` directory or `.git` file (worktree / submodule). One stat, no process. */
@@ -106,7 +121,48 @@ export class GitClient {
     if (webUrl) {
       status.webUrl = webUrl;
     }
+    const main = await worktreeMainOf(folder);
+    if (main) {
+      status.worktreeOf = main;
+    } else {
+      const worktrees = await this.worktrees(folder);
+      if (worktrees.length) {
+        status.worktrees = worktrees;
+      }
+    }
     return status;
+  }
+
+  /**
+   * Linked worktrees of a main repo, with a change count each. Costs nothing for repos without
+   * worktrees: `.git/worktrees` is checked before any process starts.
+   */
+  async worktrees(folder: string, maxWithStatus = 12): Promise<WorktreeInfo[]> {
+    try {
+      const entries = await fs.readdir(path.join(folder, '.git', 'worktrees'));
+      if (entries.length === 0) return [];
+    } catch {
+      return [];
+    }
+    const list = await run(folder, [...READ_FLAGS, 'worktree', 'list', '--porcelain'], this.timeoutMs);
+    if (!list.ok) return [];
+    const self = pathKey(folder);
+    const linked = parseWorktreeList(list.stdout).filter((w) => !w.bare && pathKey(path.resolve(w.path)) !== self);
+    return Promise.all(
+      linked.map(async (w, i): Promise<WorktreeInfo> => {
+        const info: WorktreeInfo = { path: path.resolve(w.path), branch: w.branch || 'HEAD', detached: w.detached, prunable: w.prunable, locked: w.locked };
+        if (!w.prunable && i < maxWithStatus) {
+          const st = await run(info.path, [...READ_FLAGS, 'status', '--porcelain=v2'], this.timeoutMs);
+          if (st.ok) {
+            const p = parsePorcelainV2(st.stdout);
+            info.changes = p.staged + p.modified + p.untracked + p.conflicts;
+          } else if ((st as { missingGit?: boolean }).missingGit) {
+            info.prunable = true;
+          }
+        }
+        return info;
+      }),
+    );
   }
 
   /** Background fetch of the current branch's remote. Non-interactive; hooks and fsmonitor off. */

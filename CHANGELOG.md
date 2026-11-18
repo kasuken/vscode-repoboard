@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.0
+
+- **Worktrees stay with their repo.** Linked `git worktree` folders, such as the ones coding agents create, are no
+  longer added as projects of their own. Each main repo shows a worktree badge, yellow when one has uncommitted work.
+  Its menu lists every worktree with its branch and change count, and opens it, opens a terminal there or reveals it.
+  Worktrees whose folder is gone are flagged.
+- In the sidebar, worktrees appear as children of their repo, with open, new-window, terminal and reveal actions.
+- Searching for a worktree's branch finds its repo, and the switcher shows each repo's worktree count.
+- Worktree tiles added by earlier versions are removed on the next scan. Hand-added ones stay.
+- New setting `repoBoard.worktrees`: `nested` (default) or `separate` to keep a tile per worktree.
+
 ## 1.1.3
 
 - Documentation updates.

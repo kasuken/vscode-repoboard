@@ -70,7 +70,26 @@ export interface GitStatus {
   fetchedAt?: number;
   /** Human-readable reason git could not read the repo (e.g. dubious ownership). */
   error?: string;
+  /** Linked worktrees of this repo (the main working tree itself is not listed). */
+  worktrees?: WorktreeInfo[];
+  /** Set when this folder is itself a linked worktree: the main repo's folder. */
+  worktreeOf?: string;
 }
+
+export interface WorktreeInfo {
+  path: string;
+  /** Branch name, or the short hash when detached. */
+  branch: string;
+  detached: boolean;
+  /** Uncommitted files (staged, modified, untracked, conflicted); undefined when not read. */
+  changes?: number;
+  /** The folder is gone; `git worktree prune` would remove the entry. */
+  prunable: boolean;
+  locked: boolean;
+}
+
+/** How linked worktrees appear on the board. */
+export type WorktreeMode = 'nested' | 'separate';
 
 export interface LanguageShare {
   name: string;

@@ -7,7 +7,7 @@ import { pathKey } from './domain/paths';
 import { DashboardPanel, VIEW_TYPE } from './ui/dashboardPanel';
 import { showSwitcher } from './ui/switcher';
 import { registerOnboarding } from './ui/onboarding';
-import { ProjectTree, projectArg } from './ui/tree';
+import { ProjectTree, projectArg, worktreeArg } from './ui/tree';
 
 /**
  * Activation is cheap: it registers commands, reads the small catalog JSON (to stamp "last opened"
@@ -120,6 +120,14 @@ export function activate(context: vscode.ExtensionContext): { app: App } | undef
     await vscode.window.showTextDocument(vscode.Uri.file(app.dataFile));
   });
 
+  const withWorktree = (action: 'open' | 'newWindow' | 'terminal' | 'reveal') => (arg: unknown) => {
+    const wt = worktreeArg(app, arg);
+    return wt ? app.openWorktree(wt.project, wt.path, action) : undefined;
+  };
+  command('repoBoard.worktree.open', withWorktree('open'));
+  command('repoBoard.worktree.openNewWindow', withWorktree('newWindow'));
+  command('repoBoard.worktree.terminal', withWorktree('terminal'));
+  command('repoBoard.worktree.reveal', withWorktree('reveal'));
   command('repoBoard.item.open', withItem((p) => app.open(p)));
   command('repoBoard.item.openNewWindow', withItem((p) => app.open(p, true)));
   command('repoBoard.item.terminal', withItem((p) => app.terminal(p)));

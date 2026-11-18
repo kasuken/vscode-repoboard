@@ -70,4 +70,5 @@ export type WebviewMessage =
   | { type: 'pullAll' }
   | { type: 'openSettings' }
   | { type: 'getStarted' }
+  | { type: 'worktree'; id: string; path: string; action: 'open' | 'newWindow' | 'terminal' | 'reveal' }
   | { type: 'startPage'; on: boolean };
