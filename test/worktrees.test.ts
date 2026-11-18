@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { after, test } from 'node:test';
@@ -88,16 +88,18 @@ test('GitClient reads linked worktrees from a real repository', async (t) => {
   git(app, 'worktree', 'add', '-q', '-b', 'feature/x', wt);
   writeFileSync(path.join(wt, 'b.txt'), 'b');
 
+  // Git reports canonical paths (macOS /private/var, Windows long names), so compare real paths.
+  const same = (a: string, b: string) => pathKey(realpathSync.native(a)) === pathKey(realpathSync.native(b));
   const client = new GitClient();
   const status = await client.status(app);
   assert.equal(status?.worktrees?.length, 1);
   assert.equal(status!.worktrees![0]!.branch, 'feature/x');
-  assert.equal(pathKey(status!.worktrees![0]!.path), pathKey(wt));
+  assert.ok(same(status!.worktrees![0]!.path, wt));
   assert.equal(status!.worktrees![0]!.changes, 1);
 
   const wtStatus = await client.status(wt);
-  assert.equal(pathKey(wtStatus!.worktreeOf!), pathKey(app));
+  assert.ok(same(wtStatus!.worktreeOf!, app));
   assert.equal(wtStatus!.worktrees, undefined);
-  assert.equal(pathKey((await worktreeMainOf(wt))!), pathKey(app));
+  assert.ok(same((await worktreeMainOf(wt))!, app));
   assert.equal(await worktreeMainOf(app), undefined);
 });

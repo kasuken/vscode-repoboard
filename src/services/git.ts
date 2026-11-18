@@ -3,7 +3,6 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { LOG_FORMAT, describeGitError, parseLogLine, parsePorcelainV2, parseWorktreeList, pickRemoteUrl, remoteToWebUrl, worktreeMainFromGitFile } from '../domain/gitParse';
 import { GitStatus, WorktreeInfo } from '../domain/model';
-import { pathKey } from '../domain/paths';
 
 export type RemoteOp = 'fetch' | 'pull' | 'push';
 
@@ -146,8 +145,11 @@ export class GitClient {
     }
     const list = await run(folder, [...READ_FLAGS, 'worktree', 'list', '--porcelain'], this.timeoutMs);
     if (!list.ok) return [];
-    const self = pathKey(folder);
-    const linked = parseWorktreeList(list.stdout).filter((w) => !w.bare && pathKey(path.resolve(w.path)) !== self);
+    // Git always lists the main working tree first. Don't compare paths: git reports canonical ones
+    // (macOS /private/var, Windows long names instead of 8.3, resolved symlinks) that may not match ours.
+    const linked = parseWorktreeList(list.stdout)
+      .slice(1)
+      .filter((w) => !w.bare);
     return Promise.all(
       linked.map(async (w, i): Promise<WorktreeInfo> => {
         const info: WorktreeInfo = { path: path.resolve(w.path), branch: w.branch || 'HEAD', detached: w.detached, prunable: w.prunable, locked: w.locked };
