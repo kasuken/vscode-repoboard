@@ -71,13 +71,10 @@ async function setStartPage(context: vscode.ExtensionContext, on: boolean): Prom
     if (workbench.get<string>('startupEditor') !== 'none') {
       await workbench.update('startupEditor', 'none', vscode.ConfigurationTarget.Global);
     }
-    const undo = await vscode.window.showInformationMessage(
-      'Repo Board is now your start page: it opens in every new window without a folder.',
-      'Undo',
-    );
-    if (undo) {
-      await setStartPage(context, false);
-    }
+    // Not awaited: the command is done once the settings are saved, whether or not Undo is ever clicked.
+    void vscode.window
+      .showInformationMessage('Repo Board is now your start page: it opens in every new window without a folder.', 'Undo')
+      .then((undo) => (undo ? setStartPage(context, false) : undefined));
     return;
   }
   await board.update('showOnStartup', false, vscode.ConfigurationTarget.Global);

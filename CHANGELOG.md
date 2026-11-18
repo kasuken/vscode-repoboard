@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.2
+
+- Choosing folders to scan now opens the board and shows the scan in progress. The result is always reported:
+  repos added, nothing new, repos you removed earlier, or no repos found with an option to search deeper.
+- The setup guide's first step completes as soon as the board has repos, including folders that were already scanned.
+
 ## 1.1.1
 
 - Documentation updates.

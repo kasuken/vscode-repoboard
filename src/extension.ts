@@ -13,7 +13,7 @@ import { ProjectTree, projectArg } from './ui/tree';
  * Activation is cheap: it registers commands, reads the small catalog JSON (to stamp "last opened"
  * for this window's folder and fill the status bar) and never runs git until something asks for it.
  */
-export function activate(context: vscode.ExtensionContext): void {
+export function activate(context: vscode.ExtensionContext): { app: App } | undefined {
   const app = new App(context);
   context.subscriptions.push(app);
   registerOnboarding(context, app);
@@ -30,6 +30,8 @@ export function activate(context: vscode.ExtensionContext): void {
   status.command = 'repoBoard.switch';
   context.subscriptions.push(status);
   const updateStatus = () => {
+    // Lets the setup guide tick its first step as soon as the board has repos, however they got there.
+    void vscode.commands.executeCommand('setContext', 'repoBoard.hasProjects', app.projects.projects.length > 0);
     if (!settings().statusBar) {
       status.hide();
       return;
@@ -165,6 +167,9 @@ export function activate(context: vscode.ExtensionContext): void {
       DashboardPanel.show(app);
     }
   });
+
+  // Only extension tests get a handle on the internals.
+  return context.extensionMode === vscode.ExtensionMode.Test ? { app } : undefined;
 }
 
 export function deactivate(): void {

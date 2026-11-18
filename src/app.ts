@@ -50,6 +50,14 @@ export class App implements vscode.Disposable {
   readonly meta: MetadataService;
   readonly git = new GitClient();
   readonly log = vscode.window.createOutputChannel('Repo Board');
+  /** UI entry points. Extension tests replace them: VS Code gives every extension its own API object. */
+  readonly ui = {
+    pickFolders: (options: vscode.OpenDialogOptions) => vscode.window.showOpenDialog(options),
+    info: (message: string, ...items: string[]) => vscode.window.showInformationMessage(message, ...items),
+    warn: (message: string, ...items: string[]) => vscode.window.showWarningMessage(message, ...items),
+    progress: <R>(options: vscode.ProgressOptions, task: (progress: vscode.Progress<{ message?: string; increment?: number }>, token: vscode.CancellationToken) => Thenable<R>) =>
+      vscode.window.withProgress(options, task),
+  };
   private scanning = false;
   private lastAutoScan = 0;
   private readonly scanListeners = new Set<(scanning: boolean) => void>();
@@ -95,7 +103,7 @@ export class App implements vscode.Disposable {
     }
     const availability = this.meta.get(project.path)?.availability;
     if (availability === 'offline' || availability === 'missing') {
-      const choice = await vscode.window.showWarningMessage(
+      const choice = await this.ui.warn(
         availability === 'offline' ? `The drive holding "${project.name}" is not connected.` : `The folder of "${project.name}" was deleted or moved.`,
         'Open anyway',
         'Remove from board',
@@ -123,7 +131,7 @@ export class App implements vscode.Disposable {
   async openRemote(project: Project): Promise<void> {
     const url = this.meta.get(project.path)?.git?.webUrl;
     if (!url) {
-      void vscode.window.showInformationMessage(`"${project.name}" has no remote that can be opened in a browser.`);
+      void this.ui.info(`"${project.name}" has no remote that can be opened in a browser.`);
       return;
     }
     await vscode.env.openExternal(vscode.Uri.parse(url));
@@ -151,12 +159,12 @@ export class App implements vscode.Disposable {
   }
 
   async pickFolder(): Promise<string | undefined> {
-    const picked = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, canSelectMany: false, openLabel: 'Add to Repo Board' });
+    const picked = await this.ui.pickFolders({ canSelectFolders: true, canSelectFiles: false, canSelectMany: false, openLabel: 'Add to Repo Board' });
     return picked?.[0]?.fsPath;
   }
 
   async addScanRoot(): Promise<void> {
-    const picked = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, canSelectMany: true, openLabel: 'Scan for repos' });
+    const picked = await this.ui.pickFolders({ canSelectFolders: true, canSelectFiles: false, canSelectMany: true, openLabel: 'Scan for repos' });
     if (!picked?.length) {
       return;
     }
@@ -166,7 +174,9 @@ export class App implements vscode.Disposable {
     if (added.length) {
       await config().update('scanRoots', [...current, ...added], vscode.ConfigurationTarget.Global);
     }
-    await this.scan({ notify: true });
+    // Show the board right away so the user watches the repos arrive instead of wondering if anything happened.
+    await vscode.commands.executeCommand('repoBoard.open');
+    await this.scan({ notify: true, picked: picked.map((u) => u.fsPath), alreadyScanned: added.length === 0 });
   }
 
   // ── Discovery ──────────────────────────────────────────────────────────
@@ -179,11 +189,15 @@ export class App implements vscode.Disposable {
     }
   }
 
-  async scan(options: { notify: boolean }): Promise<number> {
+  /**
+   * Scans every scan root. With `notify`, progress is shown while it runs and the result is always
+   * reported, including "nothing new" and repos skipped because the user removed them earlier.
+   */
+  async scan(options: { notify: boolean; picked?: string[]; alreadyScanned?: boolean }): Promise<number> {
     const s = settings();
     if (!s.scanRoots.length) {
       if (options.notify) {
-        const choice = await vscode.window.showInformationMessage('No scan folders yet. Pick folders that contain your repos (e.g. C:\\code).', 'Add folder to scan');
+        const choice = await this.ui.info('No scan folders yet. Pick folders that contain your repos (e.g. C:\\code).', 'Add folder to scan');
         if (choice) {
           await this.addScanRoot();
         }
@@ -191,31 +205,72 @@ export class App implements vscode.Disposable {
       return 0;
     }
     if (this.scanning) {
+      if (options.notify) {
+        void this.ui.info('Repo Board is already scanning. New repos appear on the board as soon as it finishes.');
+      }
       return 0;
     }
     this.lastAutoScan = Date.now();
     this.setScanning(true);
     try {
       await this.projects.ensureLoaded();
-      const found = await discoverRepos(s.scanRoots, { maxDepth: s.scanDepth, ignoreDirs: s.ignoreDirs });
+      const run = () => discoverRepos(s.scanRoots, { maxDepth: s.scanDepth, ignoreDirs: s.ignoreDirs });
+      const found = options.notify
+        ? await this.ui.progress({ location: vscode.ProgressLocation.Notification, title: `Scanning ${describeRoots(s.scanRoots)} for git repos…` }, run)
+        : await run();
       let added: Project[] = [];
       await this.projects.update((c) => {
         const result = mergeDiscovered(c, found);
         added = result.added;
         return result.catalog;
       });
-      this.log.appendLine(`[scan] ${found.length} repos under ${s.scanRoots.join(', ')}; ${added.length} new`);
+      const ignored = new Set(this.projects.current.ignoredPaths);
+      const skipped = found.filter((p) => ignored.has(pathKey(p))).length;
+      this.log.appendLine(`[scan] ${found.length} repos under ${s.scanRoots.join(', ')}; ${added.length} new; ${skipped} skipped (removed earlier)`);
       if (added.length) {
         void this.meta.refresh(added.map((p) => p.path), { fetch: false });
       }
       if (options.notify) {
-        void vscode.window.showInformationMessage(
-          added.length ? `Repo Board found ${added.length} new repo${added.length === 1 ? '' : 's'} (${found.length} in total).` : `No new repos (${found.length} already on the board).`,
-        );
+        // Right after picking folders, report on those folders only, not on every scan root.
+        const relevant = options.picked ? found.filter((p) => options.picked!.some((root) => isInside(p, root))) : found;
+        const relevantSkipped = relevant.filter((p) => ignored.has(pathKey(p))).length;
+        void this.reportScan(relevant.length, added.length, relevantSkipped, options);
       }
       return added.length;
     } finally {
       this.setScanning(false);
+    }
+  }
+
+  private async reportScan(found: number, added: number, skipped: number, options: { picked?: string[]; alreadyScanned?: boolean }): Promise<void> {
+    const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+    if (found === 0) {
+      const choice = await this.ui.warn(
+        `No git repositories found in ${describeRoots(options.picked ?? settings().scanRoots)} (searched ${settings().scanDepth} folder levels deep).`,
+        'Search deeper',
+        'Pick another folder',
+      );
+      if (choice === 'Search deeper') {
+        await config().update('scanDepth', Math.min(8, settings().scanDepth + 2), vscode.ConfigurationTarget.Global);
+        await this.scan({ notify: true });
+      } else if (choice === 'Pick another folder') {
+        await this.addScanRoot();
+      }
+      return;
+    }
+    const skippedNote = skipped ? ` ${plural(skipped, 'repo')} you removed earlier stayed off the board.` : '';
+    if (added > 0) {
+      void this.ui.info(`Added ${plural(added, 'repo')} to the board (${found} found in total).${skippedNote}`);
+      return;
+    }
+    const prefix = options.alreadyScanned ? 'That folder is already scanned. ' : '';
+    const choice = await this.ui.info(
+      `${prefix}All ${plural(found - skipped, 'repo')} found are already on the board.${skippedNote}`,
+      ...(skipped ? ['Bring removed repos back'] : []),
+    );
+    if (choice) {
+      await vscode.commands.executeCommand('repoBoard.resetIgnored');
+      await this.scan({ notify: true });
     }
   }
 
@@ -229,7 +284,7 @@ export class App implements vscode.Disposable {
   // ── Git ────────────────────────────────────────────────────────────────
 
   async gitOp(project: Project, op: RemoteOp): Promise<boolean> {
-    const result = await vscode.window.withProgress(
+    const result = await this.ui.progress(
       { location: vscode.ProgressLocation.Window, title: `git ${op} · ${project.name}` },
       () => this.git.remote(folderOf(project.path), op),
     );
@@ -254,14 +309,14 @@ export class App implements vscode.Disposable {
       return m?.availability === 'ok' && !!m.git?.upstream;
     });
     if (!candidates.length) {
-      void vscode.window.showInformationMessage('No repos with an upstream branch to fetch.');
+      void this.ui.info('No repos with an upstream branch to fetch.');
       return;
     }
     const failures: Array<{ project: Project; message: string }> = [];
     let pulled = 0;
     let skippedDirty = 0;
 
-    await vscode.window.withProgress(
+    await this.ui.progress(
       { location: vscode.ProgressLocation.Notification, title: op === 'fetch' ? 'Fetching repos' : 'Updating repos', cancellable: true },
       async (progress, token) => {
         const limiter = new Limiter(4);
@@ -310,9 +365,9 @@ export class App implements vscode.Disposable {
         ? `Fetched ${candidates.length - failures.length}/${candidates.length} repos. ${behind} behind, ${dirty} with local changes.`
         : `Pulled ${pulled} repo${pulled === 1 ? '' : 's'}.${skippedDirty ? ` ${skippedDirty} skipped (conflicts).` : ''} ${behind} still behind.`;
     if (failures.length) {
-      void vscode.window.showWarningMessage(`${summary} ${failures.length} failed.`, 'Show log').then((c) => c && this.log.show());
+      void this.ui.warn(`${summary} ${failures.length} failed.`, 'Show log').then((c) => c && this.log.show());
     } else {
-      void vscode.window.showInformationMessage(summary);
+      void this.ui.info(summary);
     }
   }
 
@@ -325,4 +380,16 @@ export class App implements vscode.Disposable {
 
 function firstLine(text: string): string {
   return text.split(/\r?\n/).find((l) => l.trim())?.slice(0, 200) ?? text;
+}
+
+/** "C:\code" or "3 folders", for progress and result messages. */
+function describeRoots(roots: readonly string[]): string {
+  return roots.length === 1 ? roots[0]! : `${roots.length} folders`;
+}
+
+/** True when `child` is `root` itself or somewhere below it. */
+function isInside(child: string, root: string): boolean {
+  const c = pathKey(child);
+  const r = pathKey(root);
+  return c === r || c.startsWith(r.endsWith(path.sep) ? r : r + path.sep);
 }
