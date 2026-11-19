@@ -12,6 +12,8 @@
 <p align="center">
   <a href="https://marketplace.visualstudio.com/items?itemName=emanuelebartolesi.vscode-repoboard"><b>Install from the Marketplace</b></a>
   &nbsp;·&nbsp;
+  <a href="https://kasuken.github.io/repoboard/">Website</a>
+  &nbsp;·&nbsp;
   <a href="#quick-start">Quick start</a>
   &nbsp;·&nbsp;
   <a href="#keyboard-shortcuts">Shortcuts</a>
@@ -20,6 +22,9 @@
 </p>
 
 ![Repo Board: search, filter by git state, switch between grid and list, light and dark themes](images/demo.gif)
+
+> Want the board outside VS Code too? Repo Board is also a [desktop app](https://kasuken.github.io/repoboard/#download)
+> for Windows, macOS and Linux. Both show the same board.
 
 ## Why Repo Board
 
