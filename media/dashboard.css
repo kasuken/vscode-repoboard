@@ -19,6 +19,7 @@
   --st-behind: var(--vscode-editorWarning-foreground, #cca700);
   --st-ahead: var(--vscode-charts-blue, #3794ff);
   --st-clean: var(--vscode-charts-green, #89d185);
+  --st-stash: var(--vscode-charts-purple, #b180d7);
   --st-missing: var(--vscode-errorForeground, #f48771);
   --st-idle: color-mix(in srgb, var(--fg) 14%, var(--bg));
 
@@ -198,7 +199,9 @@ kbd {
 .f-dirty .chip-n { color: var(--st-dirty); }
 .f-behind .chip-n { color: var(--st-behind); }
 .f-ahead .chip-n { color: var(--st-ahead); }
+.f-stash .chip-n { color: var(--st-stash); }
 .f-missing .chip-n { color: var(--st-missing); }
+.f-stale .chip-n { color: var(--vscode-editorWarning-foreground, #cca700); }
 .chip.tag { color: hsl(var(--hue) 55% 62%); border-color: hsl(var(--hue) 40% 45% / .45); }
 .chip.tag.on { background: hsl(var(--hue) 50% 50% / .16); border-color: hsl(var(--hue) 55% 60%); }
 .warn-inline { display: inline-flex; gap: 6px; align-items: center; color: var(--st-behind); font-size: 12px; margin-left: 8px; }
@@ -303,9 +306,13 @@ kbd {
 .b-behind { color: var(--st-behind); }
 .b-ahead { color: var(--st-ahead); }
 .b-conflict { color: var(--st-conflict); }
-.b-stash { color: var(--muted); font-weight: 500; }
+.b-stash { color: var(--st-stash); font-weight: 500; }
 .b-clean { color: var(--muted); font-weight: 400; }
 .b-clean .codicon { color: var(--st-clean); }
+.fetched { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+.fetched .codicon { font-size: 12px; }
+.fetched.warn { color: var(--vscode-editorWarning-foreground, #cca700); }
+.offline-note { display: inline-flex; align-items: center; gap: 5px; margin-left: 8px; white-space: nowrap; }
 
 .commit { display: flex; gap: 10px; align-items: baseline; font-size: 12px; color: var(--muted); min-width: 0; }
 .commit .subject { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); opacity: .8; }
@@ -507,5 +514,8 @@ body.vscode-light .chip.tag { border-color: hsl(var(--hue) 45% 45% / .4); }
 
 /* Worktree badge: a button, since it opens the repo's worktree list. */
 .badge.b-wt { border: 1px solid var(--border); border-radius: 10px; padding: 0 7px; height: 18px; background: transparent; color: var(--muted); font: inherit; font-size: 11.5px; font-weight: 500; cursor: pointer; }
+.badge.b-stash { border: 1px solid color-mix(in srgb, var(--st-stash) 45%, var(--border)); border-radius: 10px; padding: 0 7px; height: 18px; background: transparent; font: inherit; font-size: 11.5px; font-weight: 500; cursor: pointer; }
+.badge.b-stash:hover { background: color-mix(in srgb, var(--st-stash) 12%, transparent); }
+.menu-item:disabled { opacity: 0.6; cursor: default; pointer-events: none; }
 .badge.b-wt:hover { color: var(--fg); border-color: color-mix(in srgb, var(--fg) 35%, var(--border)); }
 .badge.b-wt.has-changes { color: var(--st-dirty); border-color: color-mix(in srgb, var(--st-dirty) 45%, var(--border)); }

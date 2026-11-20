@@ -1,7 +1,7 @@
 // Stubs the VS Code webview API and plays the extension host with fictional sample repos.
 // URL parameters (all optional) script the UI for screenshots:
-//   theme=light | empty=1 | view=list | sort=changes | filter=changes|behind|ahead|missing
-//   q=<search> | tag=<tag> | edit=<project id> | focus=<project id> | help=1 | menu=<project id>
+//   theme=light | empty=1 | view=list | sort=changes | filter=changes|behind|ahead|stashes|stale|missing
+//   offline=1 (the 'Offline' note) | q=<search> | tag=<tag> | edit=<project id> | focus=<project id> | help=1 | menu=<project id>
 (() => {
   const params = new URLSearchParams(location.search);
   if (params.get('theme') === 'light') {
@@ -45,22 +45,25 @@
     P('legacy', 'legacy-cms', { description: 'Replaced by storefront', lastOpenedAt: now - 200 * D }),
     P('kotlin', 'android-companion', { collectionId: 'arch', tags: ['mobile'] }),
   ];
-  const git = (o) => ({ branch: 'main', detached: false, upstream: 'origin/main', ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, conflicts: 0, stashes: 0, fetchedAt: now - 300000, webUrl: 'https://github.com/acme/repo', ...o });
+  // lastFetchAt (ms) is when anyone last fetched: mostly minutes ago, overridden below for the stale / failed / never cases.
+  let fetchSeq = 0;
+  const git = (o) => ({ branch: 'main', detached: false, upstream: 'origin/main', ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, conflicts: 0, stashes: 0, fetchedAt: now - 300000, lastFetchAt: now - (4 + (fetchSeq++ % 7) * 6) * 60000, webUrl: 'https://github.com/acme/repo', ...o });
+  const stash = (message, seconds, i) => ({ ref: `stash@{${i}}`, time: ago(seconds), message });
   const c = (subject, seconds) => ({ hash: Math.random().toString(16).slice(2, 9), subject, author: 'you', time: ago(seconds) });
   const meta = (g, languages, extra = {}) => ({ availability: 'ok', git: g, languages, updatedAt: now, languagesAt: now, ...extra });
   const M = {
-    storefront: meta(git({ modified: 3, untracked: 1, lastCommit: c('Cache product pages at the edge', 1 * H), worktrees: [
+    storefront: meta(git({ modified: 3, untracked: 1, stashes: 2, stashList: [stash('WIP on main: 9f3b2c1 Cache product pages at the edge', 2 * D, 0), stash('On feature/cart: try new cart drawer', 35 * D, 1)], lastCommit: c('Cache product pages at the edge', 1 * H), worktrees: [
       { path: 'C:/code/worktrees/storefront/agent-fix-checkout-total', branch: 'agent/fix-checkout-total', detached: false, changes: 6, prunable: false, locked: false },
       { path: 'C:/code/worktrees/storefront/agent-a11y-audit', branch: 'agent/a11y-audit', detached: false, changes: 0, prunable: false, locked: false },
       { path: 'C:/code/worktrees/storefront/review-pr-412', branch: 'review/pr-412', detached: false, changes: 0, prunable: true, locked: false },
     ] }), lang([L.TS, 78.4], [L.CSS, 14.1], [L.HTML, 7.5])),
     design: meta(git({ ahead: 2, lastCommit: c('Add Toast and Popover components', 4 * H) }), lang([L.TS, 61.2], [L.SCSS, 32.3], [L.HTML, 6.5])),
-    payments: meta(git({ behind: 4, lastCommit: c('Retry webhooks with exponential backoff', 1 * D), webUrl: 'https://dev.azure.com/acme/commerce/_git/payments-api' }), lang([L.CS, 88.6], [L.BICEP, 11.4])),
-    checkout: meta(git({ branch: 'feature/apple-pay', upstream: 'origin/feature/apple-pay', staged: 2, modified: 5, ahead: 1, behind: 2, stashes: 1, lastCommit: c('WIP: Apple Pay sheet', 2 * D) }), lang([L.VUE, 54], [L.TS, 39], [L.CSS, 7])),
-    infra: meta(git({ lastCommit: c('Scale staging down at night', 5 * D) }), lang([L.HCL, 64], [L.BICEP, 30], [L.SH, 6])),
+    payments: meta(git({ behind: 4, lastFetchAt: now - 3 * D * 1000, lastCommit: c('Retry webhooks with exponential backoff', 1 * D), webUrl: 'https://dev.azure.com/acme/commerce/_git/payments-api' }), lang([L.CS, 88.6], [L.BICEP, 11.4])),
+    checkout: meta(git({ branch: 'feature/apple-pay', upstream: 'origin/feature/apple-pay', staged: 2, modified: 5, ahead: 1, behind: 2, stashes: 1, stashList: [stash('WIP on feature/apple-pay: 4e1c9a2 Apple Pay sheet', 3 * D, 0)], lastCommit: c('WIP: Apple Pay sheet', 2 * D) }), lang([L.VUE, 54], [L.TS, 39], [L.CSS, 7])),
+    infra: meta(git({ lastFetchAt: now - 14 * D * 1000, fetchError: "fatal: Authentication failed for 'https://dev.azure.com/acme/_git/acme-infra'", lastCommit: c('Scale staging down at night', 5 * D) }), lang([L.HCL, 64], [L.BICEP, 30], [L.SH, 6])),
     router: meta(git({ conflicts: 2, modified: 1, lastCommit: c('Merge branch main into v3', 3 * D) }), lang([L.TS, 100])),
-    theme: meta(git({ lastCommit: c('Softer selection background', 20 * D) }), lang([L.JS, 100])),
-    lint: meta(git({ upstream: undefined, webUrl: undefined, lastCommit: c('Initial commit', 12 * H) }), lang([L.TS, 92], [L.SH, 8])),
+    theme: meta(git({ lastFetchAt: undefined, lastCommit: c('Softer selection background', 20 * D) }), lang([L.JS, 100])),
+    lint: meta(git({ upstream: undefined, lastFetchAt: undefined, webUrl: undefined, stashes: 1, stashList: [stash('On main: fix flaky lint rule', 4 * D, 0)], lastCommit: c('Initial commit', 12 * H) }), lang([L.TS, 92], [L.SH, 8])),
     ray: meta(git({ untracked: 6, modified: 2, lastCommit: c('Soft shadows, finally', 6 * H) }), lang([L.RS, 100])),
     habit: meta(git({ behind: 1, lastCommit: c('Lock-screen widget', 9 * D) }), lang([L.SWIFT, 100])),
     blog: meta(git({ lastCommit: c('Post: what I learned shipping a VS Code extension', 2 * D) }), lang([L.ASTRO, 58], [L.TS, 24], [L.CSS, 18])),
@@ -78,6 +81,7 @@
     settings: { openInNewWindow: false, defaultView: 'grid', defaultSort: 'recent', hasScanRoots: true, startPage: false, isMac: false },
     canAddCurrent: false,
     scanning: false,
+    fetchOffline: !!params.get('offline'),
     gitAvailable: true,
   };
   const initialUi = {

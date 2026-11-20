@@ -6,6 +6,7 @@ import { Project, SortMode, ViewMode, WorktreeMode, changedFiles } from './domai
 import { expandHome, folderOf, pathKey } from './domain/paths';
 import { discoverRepos } from './services/discovery';
 import { GitClient, RemoteOp, worktreeMainOf } from './services/git';
+import { AutoFetcher } from './services/autoFetch';
 import { Limiter, MetadataService } from './services/metadata';
 import { ProjectService } from './services/projectService';
 import { CatalogStore, sharedDataDir } from './storage/catalogStore';
@@ -24,12 +25,17 @@ export function settings() {
     defaultView: c.get<ViewMode>('defaultView', 'grid'),
     defaultSort: c.get<SortMode>('defaultSort', 'recent'),
     fetchOnOpen: c.get<boolean>('fetchOnOpen', true),
+    fetchInterval: clampInt(c.get<number>('fetchInterval', 30), 0, 1440, 30),
     cacheMinutes: Math.max(0, c.get<number>('cacheMinutes', 5)),
     detectLanguages: c.get<boolean>('detectLanguages', true),
     maxFilesScanned: Math.max(100, c.get<number>('maxFilesScanned', 10000)),
     statusBar: c.get<boolean>('statusBar', true),
     worktrees: c.get<WorktreeMode>('worktrees', 'nested'),
   };
+}
+
+function clampInt(value: unknown, min: number, max: number, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, Math.round(value))) : fallback;
 }
 
 /** The folder or .code-workspace file open in this window, if any. */
@@ -50,6 +56,8 @@ export class App implements vscode.Disposable {
   readonly projects: ProjectService;
   readonly meta: MetadataService;
   readonly git = new GitClient();
+  /** Background fetch scheduler: runs while this window's extension host is alive. */
+  readonly autoFetch: AutoFetcher;
   readonly log = vscode.window.createOutputChannel('Repo Board');
   /** UI entry points. Extension tests replace them: VS Code gives every extension its own API object. */
   readonly ui = {
@@ -62,6 +70,10 @@ export class App implements vscode.Disposable {
   private scanning = false;
   private lastAutoScan = 0;
   private readonly scanListeners = new Set<(scanning: boolean) => void>();
+  /** True while Fetch all / Pull all runs; the scheduled fetch waits. */
+  private bulkRunning = false;
+  private fetchOffline = false;
+  private readonly offlineListeners = new Set<(offline: boolean) => void>();
 
   constructor(readonly context: vscode.ExtensionContext) {
     this.projects = new ProjectService(new CatalogStore(path.join(sharedDataDir(), 'catalog.json')));
@@ -70,6 +82,49 @@ export class App implements vscode.Disposable {
       detectLanguages: () => settings().detectLanguages,
       scanOptions: () => ({ ignoreDirs: settings().ignoreDirs, maxFiles: settings().maxFilesScanned }),
     });
+    this.autoFetch = new AutoFetcher({
+      meta: this.meta,
+      projects: () => this.projects.projects,
+      intervalMinutes: () => settings().fetchInterval,
+      busy: () => this.bulkRunning,
+      log: (line) => this.log.appendLine(line),
+      onOffline: (offline) => {
+        this.fetchOffline = offline;
+        for (const listener of this.offlineListeners) listener(offline);
+      },
+    });
+  }
+
+  /** The last background fetch cycle failed for every repo it tried (probably no network). */
+  get isFetchOffline(): boolean {
+    return this.fetchOffline;
+  }
+
+  onFetchOffline(listener: (offline: boolean) => void): vscode.Disposable {
+    this.offlineListeners.add(listener);
+    return new vscode.Disposable(() => this.offlineListeners.delete(listener));
+  }
+
+  /**
+   * Re-reads every repo's local state (stale ones, or all with `force`); with `fetchMinAgeMs` and the "fetch on open"
+   * setting it then fetches the repos not fetched within that age by any tool. The fetch goes through the scheduler, so
+   * being offline shows as one note instead of "fetch failed" on every repo.
+   */
+  async refreshAll(options: { force?: boolean; fetchMinAgeMs?: number } = {}): Promise<void> {
+    try {
+      await this.projects.ensureLoaded();
+      await this.meta.refresh(this.projects.projects.map((p) => p.path), options.force ? { force: true } : {});
+      if (options.fetchMinAgeMs !== undefined && settings().fetchOnOpen) {
+        await this.autoFetch.runCycle({ minAgeMs: options.fetchMinAgeMs });
+      }
+    } catch (e) {
+      this.log.appendLine(`[fetch] ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  /** Re-reads the settings that drive the background fetch timer. */
+  onConfigChanged(): void {
+    this.autoFetch.sync();
   }
 
   get isScanning(): boolean {
@@ -328,8 +383,15 @@ export class App implements vscode.Disposable {
       this.log.appendLine(`[${op}] ${project.path}\n${result.message}`);
       void vscode.window.showErrorMessage(`git ${op} failed for "${project.name}": ${firstLine(result.message)}`, 'Show log').then((c) => c && this.log.show());
     }
+    // A failed pull is usually not a network failure (not fast-forwardable), so only fetches record an error.
+    if (op === 'fetch' || (op === 'pull' && result.ok)) this.noteFetch(project, result);
     await this.meta.refreshOne(project.path, { force: true });
     return result.ok;
+  }
+
+  private noteFetch(project: Project, result: { ok: boolean; message: string }): void {
+    this.meta.recordFetch(project.path, result);
+    if (result.ok) this.autoFetch.noteOnline();
   }
 
   /**
@@ -337,6 +399,19 @@ export class App implements vscode.Disposable {
    * the ones that are behind and have no conflicts. There is deliberately no "push all".
    */
   async bulk(op: 'fetch' | 'pull'): Promise<void> {
+    if (this.bulkRunning) {
+      void this.ui.info('Repo Board is already fetching. Try again when it has finished.');
+      return;
+    }
+    this.bulkRunning = true;
+    try {
+      await this.bulkRun(op);
+    } finally {
+      this.bulkRunning = false;
+    }
+  }
+
+  private async bulkRun(op: 'fetch' | 'pull'): Promise<void> {
     await this.projects.ensureLoaded();
     // Read local state first for projects never seen, so non-repos and repos without upstream are skipped.
     await this.meta.refresh(this.projects.projects.filter((p) => !this.meta.get(p.path)).map((p) => p.path));
@@ -365,6 +440,7 @@ export class App implements vscode.Disposable {
                 return;
               }
               const fetched = await this.git.remote(folderOf(project.path), 'fetch');
+              this.noteFetch(project, fetched);
               if (!fetched.ok) {
                 failures.push({ project, message: fetched.message });
               }
@@ -376,6 +452,7 @@ export class App implements vscode.Disposable {
                 } else {
                   const res = await this.git.remote(folderOf(project.path), 'pull');
                   if (res.ok) {
+                    this.noteFetch(project, res);
                     pulled++;
                   } else {
                     failures.push({ project, message: res.message });
@@ -408,6 +485,8 @@ export class App implements vscode.Disposable {
   }
 
   dispose(): void {
+    this.autoFetch.stop();
+    this.offlineListeners.clear();
     void this.meta.persist();
     this.projects.dispose();
     this.log.dispose();

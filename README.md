@@ -47,8 +47,8 @@ Repo Board replaces that with one screen:
 ### The whole fleet at a glance
 
 The strip at the top has one cell per repo, coloured by its git state. The chips under it filter the board to what
-matters right now: repos **with changes**, **behind**, **ahead** or **unavailable**. Sort by *most changes* and the
-repos that need you come first.
+matters right now: repos **with changes**, **behind**, **ahead**, **with stashes**, **unavailable** or **not fetched
+recently**. Sort by *most changes* and the repos that need you come first.
 
 ![Repos with uncommitted changes, sorted by most changes](images/attention.png)
 
@@ -71,6 +71,27 @@ one. Fetch, pull and push buttons appear when there is something to do.
 
 Most of this comes from a single `git status --porcelain=v2` call per repo. A board of 80 repos refreshes in a few
 seconds and is shown instantly from cache while that happens.
+
+### Know how fresh "behind" is
+
+A behind count is only as current as the last `git fetch`. Every tile says when its repo was last fetched, such as
+*fetched 20m ago*, and turns it into a warning once that is more than a day ago or never happened. The time comes from
+the repo itself, so fetches from the command line, VS Code or the Repo Board desktop app count too. The switcher and
+the sidebar tooltips say it as well.
+
+While VS Code is open, Repo Board also fetches in the background, every 30 minutes by default, and skips any repo that
+something else fetched recently, so several windows never fetch the same repo twice. If a fetch fails, for example
+because a token expired, the tile says *fetch failed* and why, instead of quietly showing old numbers. When the network
+is down, the board shows one *Offline* note instead of an error on every repo.
+
+### Stashes don't get lost
+
+Stashes never show up as changed files, so a repo whose only unsaved work is a stash looks clean. Repo Board shows a
+*2 stashes* badge on the tile, with the age of the oldest in its tooltip. Click it to list each stash with its branch,
+message and age. The **with stashes** chip finds them all, *most changes* ranks stashed repos above clean ones, and the
+switcher and sidebar show the count too.
+
+![A repo's stashes listed with their branch, message and age](images/stashes.png)
 
 ### Auto-discovery
 
@@ -211,7 +232,8 @@ The switcher keybinding is `repoBoard.switch`, so you can rebind it in **Keyboar
 | `repoBoard.showOnStartup` | `false` | Open the dashboard in windows that start without a folder |
 | `repoBoard.defaultView` | `grid` | `grid` or `list` |
 | `repoBoard.defaultSort` | `recent` | `manual`, `recent`, `name`, `commit` or `changes` |
-| `repoBoard.fetchOnOpen` | `true` | Background `git fetch` when the dashboard opens, so ahead/behind is real |
+| `repoBoard.fetchOnOpen` | `true` | `git fetch` when the dashboard opens and on refresh, skipping repos fetched in the last 10 minutes |
+| `repoBoard.fetchInterval` | `30` | Minutes between background fetches of each repo; repos fetched recently by any tool are skipped; `0` turns it off |
 | `repoBoard.cacheMinutes` | `5` | How long git status is reused before it is read again |
 | `repoBoard.detectLanguages` | `true` | Show the language bar |
 | `repoBoard.maxFilesScanned` | `10000` | File cap per project for language detection |

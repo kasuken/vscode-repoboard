@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import { LOG_FORMAT, describeGitError, parseLogLine, parsePorcelainV2, parseWorktreeList, pickRemoteUrl, remoteToWebUrl, worktreeMainFromGitFile } from '../domain/gitParse';
+import { LOG_FORMAT, describeGitError, parseLogLine, parsePorcelainV2, parseStashList, parseWorktreeList, pickRemoteUrl, remoteToWebUrl, worktreeMainFromGitFile } from '../domain/gitParse';
 import { GitStatus, WorktreeInfo } from '../domain/model';
 
 export type RemoteOp = 'fetch' | 'pull' | 'push';
@@ -65,6 +65,75 @@ export async function isRepo(folder: string): Promise<boolean> {
   }
 }
 
+/**
+ * When the remote was last fetched by anyone (git on the command line, VS Code, the Repo Board desktop app, another
+ * window), in ms since the epoch. Read from file times only, no process: the newest of every `FETCH_HEAD` (own, common
+ * dir, linked worktrees) and the remote-tracking reflogs, which `git clone` writes so a fresh clone still has a time.
+ * null when nothing exists.
+ */
+export async function gitLastFetch(folder: string): Promise<number | null> {
+  const mtime = async (p: string): Promise<number | null> => {
+    try {
+      return (await fs.stat(p)).mtimeMs;
+    } catch {
+      return null;
+    }
+  };
+  // A failed fetch truncates FETCH_HEAD to 0 bytes (bumping its mtime); a successful one lists the fetched refs.
+  const fetchHead = async (p: string): Promise<number | null> => {
+    try {
+      const st = await fs.stat(p);
+      return st.size > 0 ? st.mtimeMs : null;
+    } catch {
+      return null;
+    }
+  };
+  let gitdir = path.join(folder, '.git');
+  let common = gitdir;
+  try {
+    if ((await fs.lstat(gitdir)).isFile()) {
+      const m = /^gitdir:s*(.+)$/m.exec(await fs.readFile(gitdir, 'utf8'));
+      if (!m) return null;
+      gitdir = path.resolve(folder, m[1]!.trim());
+      common = gitdir;
+      try {
+        const c = (await fs.readFile(path.join(gitdir, 'commondir'), 'utf8')).trim();
+        if (c) common = path.resolve(gitdir, c);
+      } catch {
+        // no commondir: a plain gitdir
+      }
+    }
+  } catch {
+    return null;
+  }
+  const times: Array<number | null> = [await fetchHead(path.join(gitdir, 'FETCH_HEAD')), await fetchHead(path.join(common, 'FETCH_HEAD'))];
+  try {
+    for (const w of (await fs.readdir(path.join(common, 'worktrees'))).slice(0, 500)) times.push(await fetchHead(path.join(common, 'worktrees', w, 'FETCH_HEAD')));
+  } catch {
+    // no linked worktrees
+  }
+  let seen = 0;
+  const walk = async (dir: string, depth: number): Promise<void> => {
+    let entries;
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (++seen > 2000) return;
+      if (e.isDirectory()) {
+        if (depth < 6) await walk(path.join(dir, e.name), depth + 1);
+      } else if (e.isFile()) {
+        times.push(await mtime(path.join(dir, e.name)));
+      }
+    }
+  };
+  await walk(path.join(common, 'logs', 'refs', 'remotes'), 0);
+  const found = times.filter((t): t is number => t !== null);
+  return found.length ? Math.max(...found) : null;
+}
+
 export class GitClient {
   private gitMissing = false;
 
@@ -80,11 +149,12 @@ export class GitClient {
       return null;
     }
     const read = (args: string[]) => run(folder, [...READ_FLAGS, ...args], this.timeoutMs);
-    const [st, log, stash, remotes] = await Promise.all([
+    const [st, log, stash, remotes, lastFetch] = await Promise.all([
       read(['status', '--porcelain=v2', '--branch']),
       read(['log', '-1', `--format=${LOG_FORMAT}`]),
-      read(['rev-list', '--walk-reflogs', '--count', 'refs/stash']),
+      read(['stash', 'list', '--format=%gd%x1f%ct%x1f%gs']),
       read(['remote', '-v']),
+      gitLastFetch(folder).catch(() => null),
     ]);
     if (st.missingGit) {
       this.gitMissing = true;
@@ -107,10 +177,14 @@ export class GitClient {
       modified: parsed.modified,
       untracked: parsed.untracked,
       conflicts: parsed.conflicts,
-      stashes: stash.ok ? Number(stash.stdout.trim()) || 0 : 0,
+      stashes: 0,
     };
+    const stashList = stash.ok ? parseStashList(stash.stdout) : [];
     if (parsed.upstream) {
       status.upstream = parsed.upstream;
+      if (typeof lastFetch === 'number' && lastFetch > 0) {
+        status.lastFetchAt = lastFetch;
+      }
     }
     const commit = log.ok ? parseLogLine(log.stdout) : undefined;
     if (commit) {
@@ -122,8 +196,13 @@ export class GitClient {
     }
     const main = await worktreeMainOf(folder);
     if (main) {
+      // refs/stash is shared with the main repo, which shows it; repeating it on every worktree tile is noise.
       status.worktreeOf = main;
     } else {
+      status.stashes = stashList.length;
+      if (stashList.length) {
+        status.stashList = stashList.slice(0, 50);
+      }
       const worktrees = await this.worktrees(folder);
       if (worktrees.length) {
         status.worktrees = worktrees;
@@ -167,10 +246,17 @@ export class GitClient {
     );
   }
 
-  /** Background fetch of the current branch's remote. Non-interactive; hooks and fsmonitor off. */
-  async fetch(folder: string): Promise<boolean> {
-    const result = await run(folder, [...READ_FLAGS, 'fetch', '--quiet', '--no-tags', '--no-write-fetch-head'], this.fetchTimeoutMs);
-    return result.ok;
+  /**
+   * Background fetch of the current branch's remote. Non-interactive; hooks and fsmonitor off. It writes FETCH_HEAD on
+   * purpose: that timestamp is what every other tool (and our own "fetched 3d ago" hint) reads to know when the remote
+   * was last contacted. `message` is git's stderr when it failed.
+   */
+  async fetch(folder: string): Promise<{ ok: boolean; message: string }> {
+    const result = await run(folder, [...READ_FLAGS, 'fetch', '--quiet', '--no-tags'], this.fetchTimeoutMs);
+    if (result.missingGit) {
+      return { ok: false, message: 'git was not found on PATH.' };
+    }
+    return { ok: result.ok, message: result.ok ? '' : result.stderr.trim() || 'git fetch failed' };
   }
 
   /**

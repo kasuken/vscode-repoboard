@@ -18,6 +18,9 @@ export function activate(context: vscode.ExtensionContext): { app: App } | undef
   context.subscriptions.push(app);
   registerOnboarding(context, app);
 
+  // Background fetch while this window is open. It acts only once the catalog and the status cache are loaded.
+  app.autoFetch.start();
+
   const tree = new ProjectTree(app);
   const treeView = vscode.window.createTreeView('repoBoard.projects', { treeDataProvider: tree, showCollapseAll: true });
   context.subscriptions.push(tree, treeView);
@@ -76,7 +79,7 @@ export function activate(context: vscode.ExtensionContext): { app: App } | undef
   command('repoBoard.addScanRoot', () => app.addScanRoot());
   command('repoBoard.refresh', async () => {
     await app.projects.ensureLoaded();
-    await app.meta.refresh(app.projects.projects.map((p) => p.path), { force: true, fetch: settings().fetchOnOpen });
+    await app.refreshAll({ force: true, fetchMinAgeMs: 0 });
   });
   command('repoBoard.fetchAll', () => app.bulk('fetch'));
   command('repoBoard.pullAll', () => app.bulk('pull'));
@@ -151,7 +154,10 @@ export function activate(context: vscode.ExtensionContext): { app: App } | undef
       },
     }),
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration('repoBoard')) updateStatus();
+      if (e.affectsConfiguration('repoBoard')) {
+        updateStatus();
+        app.onConfigChanged();
+      }
     }),
     vscode.workspace.onDidChangeWorkspaceFolders(() => updateStatus()),
   );

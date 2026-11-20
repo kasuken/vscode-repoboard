@@ -1,7 +1,8 @@
 import { EventEmitter } from 'node:events';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import { Availability, ProjectMeta } from '../domain/model';
+import { cleanFetchError, isConcurrentFetchError } from '../domain/gitParse';
+import { Availability, GitStatus, ProjectMeta } from '../domain/model';
 import { folderOf, pathKey } from '../domain/paths';
 import { GitClient } from './git';
 import { ScanOptions, findLogo, scanLanguages } from './languageScanner';
@@ -41,7 +42,7 @@ export interface RefreshOptions {
 }
 
 const LANGUAGE_TTL_MS = 24 * 3_600_000;
-const FETCH_MIN_INTERVAL_MS = 10 * 60_000;
+export const FETCH_MIN_INTERVAL_MS = 10 * 60_000;
 
 /**
  * Derived per-project state (git, languages, logo), cached on disk so the dashboard renders
@@ -103,7 +104,7 @@ export class MetadataService extends EventEmitter {
     const wantsFetch =
       options.fetch === true &&
       !!previous?.git?.upstream &&
-      (options.force || now - (previous.git.fetchedAt ?? 0) > FETCH_MIN_INTERVAL_MS);
+      (options.force || now - (previous.git.lastFetchAt ?? previous.git.fetchedAt ?? 0) > FETCH_MIN_INTERVAL_MS);
 
     if (localFresh && !options.force && !wantsFetch) {
       return;
@@ -115,10 +116,16 @@ export class MetadataService extends EventEmitter {
 
       if (options.fetch && meta.availability === 'ok' && meta.git?.upstream && (wantsFetch || !previous)) {
         const fetched = await this.network.run(() => this.git.fetch(folderOf(projectPath)));
-        if (fetched) {
+        if (fetched.ok) {
           const git = await this.local.run(() => this.git.status(folderOf(projectPath)));
-          meta = { ...meta, git: git ? { ...git, fetchedAt: Date.now() } : null };
+          meta = { ...meta, git: git ? withFetchedAt(git, Date.now()) : null };
           this.store(key, meta);
+        } else if (isConcurrentFetchError(fetched.message)) {
+          // Someone else is fetching this repo right now: not a failure. Show what their fetch has written so far.
+          meta = await this.local.run(() => this.readLocal(projectPath, this.cache[key]));
+          this.store(key, meta);
+        } else {
+          this.recordFetch(projectPath, fetched);
         }
       }
     } finally {
@@ -143,6 +150,11 @@ export class MetadataService extends EventEmitter {
     ]);
     if (git && previous?.git?.fetchedAt) {
       git.fetchedAt = previous.git.fetchedAt;
+      if (git.upstream) git.lastFetchAt = Math.max(git.lastFetchAt ?? 0, git.fetchedAt);
+    }
+    // A plain status read says nothing about the network: keep what the last fetch told us.
+    if (git && git.upstream && previous?.git?.fetchError) {
+      git.fetchError = previous.git.fetchError;
     }
     const meta: ProjectMeta = {
       availability,
@@ -155,6 +167,74 @@ export class MetadataService extends EventEmitter {
       meta.logo = logo;
     }
     return meta;
+  }
+
+  /**
+   * Records the outcome of a fetch that ran elsewhere (the user's fetch / pull, or a failed background fetch) on the
+   * cached git status: success clears `fetchError` and stamps `fetchedAt`; failure stores a cleaned `fetchError`.
+   * A failure caused by another process fetching the same repo at the same moment is not recorded.
+   * `quietFailure` records only successes (the scheduler uses it when a cycle looks like "offline").
+   */
+  recordFetch(projectPath: string, result: { ok: boolean; message: string }, options: { quietFailure?: boolean } = {}): void {
+    const key = pathKey(projectPath);
+    const previous = this.cache[key];
+    if (!previous?.git) return;
+    let git: GitStatus;
+    if (!result.ok && isConcurrentFetchError(result.message)) {
+      return;
+    }
+    if (result.ok) {
+      git = withFetchedAt(previous.git, Date.now());
+    } else if (options.quietFailure) {
+      return;
+    } else {
+      git = { ...previous.git, fetchError: cleanFetchError(result.message) || 'git fetch failed' };
+    }
+    this.store(key, { ...previous, git });
+  }
+
+  /**
+   * Scheduled background fetch of one repo: runs through the same network limiter and in-flight map as refreshes, so it
+   * never overlaps a manual refresh of the same repo. A success re-reads the status and clears `fetchError`; a failure
+   * is recorded unless `quietFailure`.
+   *  - `recheck` runs inside the limiter slot, right before git starts: it may have waited behind other fetches, and
+   *    another window or tool may have fetched the repo meanwhile. Returning false gives 'skipped'.
+   *  - 'skipped' also means the repo is already being refreshed.
+   *  - 'concurrent' means another process holds git's locks for this repo (it is being fetched elsewhere): neither a
+   *    failure nor offline.
+   */
+  async fetchInBackground(
+    projectPath: string,
+    options: { quietFailure?: boolean; recheck?: () => Promise<boolean> } = {},
+  ): Promise<{ outcome: 'ok' | 'failed' | 'skipped' | 'concurrent'; message: string }> {
+    const key = pathKey(projectPath);
+    if (this.inFlight.has(key)) return { outcome: 'skipped', message: '' };
+    let result: { outcome: 'ok' | 'failed' | 'skipped' | 'concurrent'; message: string } = { outcome: 'failed', message: '' };
+    const job = (async () => {
+      try {
+        const fetched = await this.network.run(async () => ((await options.recheck?.()) === false ? null : this.git.fetch(folderOf(projectPath))));
+        if (!fetched) {
+          result = { outcome: 'skipped', message: '' };
+          return;
+        }
+        const concurrent = !fetched.ok && isConcurrentFetchError(fetched.message);
+        result = { outcome: fetched.ok ? 'ok' : concurrent ? 'concurrent' : 'failed', message: fetched.message };
+        if (fetched.ok) {
+          const meta = await this.local.run(() => this.readLocal(projectPath, this.cache[key]));
+          this.store(key, meta.git ? { ...meta, git: withFetchedAt(meta.git, Date.now()) } : meta);
+        } else if (concurrent) {
+          // Another process is fetching this repo: not a failure and not offline. Just show its current state.
+          this.store(key, await this.local.run(() => this.readLocal(projectPath, this.cache[key])));
+        } else if (!options.quietFailure) {
+          this.recordFetch(projectPath, fetched);
+        }
+      } catch (e) {
+        result = { outcome: 'failed', message: e instanceof Error ? e.message : String(e) };
+      }
+    })().finally(() => this.inFlight.delete(key));
+    this.inFlight.set(key, job);
+    await job;
+    return result;
   }
 
   private store(key: string, meta: ProjectMeta): void {
@@ -207,4 +287,10 @@ async function availabilityOf(projectPath: string): Promise<Availability> {
       return 'offline';
     }
   }
+}
+
+/** Records our own successful fetch: it counts as "last fetched" and clears any earlier fetch error. */
+export function withFetchedAt(git: GitStatus, at: number): GitStatus {
+  const { fetchError: _cleared, ...rest } = git;
+  return { ...rest, fetchedAt: at, ...(git.upstream ? { lastFetchAt: Math.max(git.lastFetchAt ?? 0, at) } : {}) };
 }

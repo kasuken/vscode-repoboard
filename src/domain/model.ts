@@ -50,6 +50,15 @@ export interface CommitInfo {
   time: number;
 }
 
+export interface StashEntry {
+  /** e.g. `stash@{0}`. */
+  ref: string;
+  /** Unix seconds. */
+  time: number;
+  /** e.g. `WIP on main: 1a2b3c subject` or `On feature: my note`. */
+  message: string;
+}
+
 export interface GitStatus {
   /** Branch name, or the short hash when detached. */
   branch: string;
@@ -62,12 +71,19 @@ export interface GitStatus {
   modified: number;
   untracked: number;
   conflicts: number;
+  /** Number of stash entries (0 on a linked worktree: the stash is shared and shown on the main repo). */
   stashes: number;
+  /** Up to 50 stash entries, newest first. Absent when there are none or this is a linked worktree. */
+  stashList?: StashEntry[];
   lastCommit?: CommitInfo;
   /** Browser URL of the main remote, credentials stripped. */
   webUrl?: string;
   /** When ahead/behind was last compared against a fresh `git fetch` (ms). */
   fetchedAt?: number;
+  /** When the remote was last fetched by anyone (FETCH_HEAD / remote reflog mtime), merged with our own fetchedAt (ms). */
+  lastFetchAt?: number;
+  /** Why the last fetch failed (credentials stripped, one line). Set by a failed fetch, cleared by the next successful one; only meaningful with an upstream. */
+  fetchError?: string;
   /** Human-readable reason git could not read the repo (e.g. dubious ownership). */
   error?: string;
   /** Linked worktrees of this repo (the main working tree itself is not listed). */
@@ -125,6 +141,16 @@ export function pendingCount(git: GitStatus | null | undefined): number {
     return 0;
   }
   return git.staged + git.modified + git.untracked + git.conflicts + git.ahead + git.behind;
+}
+
+/** Stashed repos rank above truly clean ones when the pending counts tie. */
+export function stashCount(git: GitStatus | null | undefined): number {
+  return git?.stashes ?? 0;
+}
+
+/** The "with stashes" filter chip. */
+export function hasStashes(git: GitStatus | null | undefined): boolean {
+  return stashCount(git) > 0;
 }
 
 export function changedFiles(git: GitStatus | null | undefined): number {

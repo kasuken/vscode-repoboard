@@ -2,7 +2,7 @@
   "name": "vscode-repoboard",
   "displayName": "Repo Board",
   "description": "All your git repos on one board: auto-discovers every repo on disk, shows which ones are dirty, behind or ahead at a glance, and switches between them with Ctrl+Alt+P. Fetch or pull them all in one click.",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "publisher": "emanuelebartolesi",
   "author": {
     "name": "Emanuele Bartolesi",
@@ -556,7 +556,14 @@
         "repoBoard.fetchOnOpen": {
           "type": "boolean",
           "default": true,
-          "description": "Run `git fetch` (non-interactive, in the background) when the dashboard opens so ahead/behind counts are real."
+          "description": "Run `git fetch` (non-interactive, in the background) when the dashboard opens and on refresh, skipping repos fetched in the last 10 minutes."
+        },
+        "repoBoard.fetchInterval": {
+          "type": "number",
+          "default": 30,
+          "minimum": 0,
+          "maximum": 1440,
+          "description": "Minutes between background fetches of each repo. Repos fetched recently by any tool (git, VS Code, the Repo Board desktop app) are skipped. 0 turns it off."
         },
         "repoBoard.cacheMinutes": {
           "type": "number",

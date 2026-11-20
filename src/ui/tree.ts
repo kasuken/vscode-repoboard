@@ -1,6 +1,7 @@
 import * as os from 'node:os';
 import * as vscode from 'vscode';
 import { App, settings } from '../app';
+import { fetchFreshness } from '../domain/freshness';
 import { Collection, Project, WorktreeInfo, changedFiles } from '../domain/model';
 import { displayPath, pathKey } from '../domain/paths';
 import { relativeTime, sortProjects } from '../domain/search';
@@ -93,6 +94,7 @@ export class ProjectTree implements vscode.TreeDataProvider<Node>, vscode.Dispos
       if (changes) bits.push(`●${changes}`);
       if (git.behind) bits.push(`↓${git.behind}`);
       if (git.ahead) bits.push(`↑${git.ahead}`);
+      if (git.stashes) bits.push(`${git.stashes} stashed`);
     }
     if (m?.availability === 'missing') bits.push('missing');
     if (m?.availability === 'offline') bits.push('offline');
@@ -116,9 +118,21 @@ export class ProjectTree implements vscode.TreeDataProvider<Node>, vscode.Dispos
         git.modified && `${git.modified} modified`,
         git.untracked && `${git.untracked} untracked`,
         git.conflicts && `${git.conflicts} conflicts`,
-        git.stashes && `${git.stashes} stashed`,
       ].filter(Boolean);
       if (parts.length) tip.appendMarkdown(`$(diff) ${parts.join(', ')}  \n`);
+      if (git.stashes) {
+        const oldest = git.stashList?.[git.stashList.length - 1];
+        const age = oldest && git.stashList!.length === git.stashes ? ` (oldest ${relativeTime(oldest.time * 1000)})` : '';
+        tip.appendMarkdown(`$(archive) ${git.stashes} stash${git.stashes === 1 ? '' : 'es'}${escapeMd(age)}  \n`);
+      }
+      const fresh = fetchFreshness(git);
+      if (fresh.kind === 'failed') {
+        tip.appendMarkdown(`$(warning) Fetch failed: ${escapeMd(git.fetchError ?? '')}  \n`);
+      } else if (fresh.kind === 'never') {
+        tip.appendMarkdown(`$(warning) Never fetched  \n`);
+      } else if (fresh.kind !== 'none') {
+        tip.appendMarkdown(`${fresh.kind === 'stale' ? '$(warning)' : '$(history)'} Last fetched ${escapeMd(fresh.label.replace(/^fetched /, ''))}  \n`);
+      }
       if (git.error) tip.appendMarkdown(`$(warning) ${escapeMd(git.error)}  \n`);
       if (git.worktrees?.length) tip.appendMarkdown(`$(repo-forked) ${git.worktrees.length} linked worktree${git.worktrees.length === 1 ? '' : 's'}  \n`);
     }

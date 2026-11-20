@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.3.0
+
+- **Know how fresh "behind" is.** Every tile says when its repo was last fetched (*fetched 20m ago*) and turns it
+  into a warning after a day or when it never happened. Fetches by any tool count: git on the command line, VS Code or
+  the Repo Board desktop app. A **not fetched recently** chip lists those repos, and the switcher and the sidebar
+  tooltips flag them too.
+- **Background fetch.** While VS Code is open, Repo Board fetches every 30 minutes by default (new setting
+  `repoBoard.fetchInterval`; 0 turns it off) and skips repos something else fetched recently, so several windows don't
+  fetch the same repo twice. Background fetches now update `FETCH_HEAD`, so other tools see them. A fetch that collides
+  with another git process on the same repo is ignored instead of reported as a failure.
+- **Fetch failures are visible.** A repo whose fetch fails shows *fetch failed* with the reason instead of quietly
+  keeping old numbers. When every fetch fails, the board shows one *Offline* note instead.
+- `repoBoard.fetchOnOpen` now also covers the board's refresh button, and skips repos fetched in the last 10 minutes.
+- **Stashes don't get lost.** The stash badge says *2 stashes* and gives the oldest one's age; click it to list each
+  stash with its branch, message and age. A **with stashes** chip finds them, *most changes* ranks stashed repos above
+  clean ones, the switcher and sidebar show the count, and worktree tiles no longer repeat their main repo's stashes.
+
 ## 1.2.1
 
 - Fixed a repo listing itself among its own worktrees when it is reached through a symlink, a Windows short (8.3)

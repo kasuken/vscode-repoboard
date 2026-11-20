@@ -1,5 +1,5 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "noEmit": false },
-  "include": ["src/domain", "src/services/discovery.ts", "src/services/languageScanner.ts", "src/services/git.ts", "test"]
+  "include": ["src/domain", "src/services/discovery.ts", "src/services/languageScanner.ts", "src/services/git.ts", "src/services/metadata.ts", "src/services/autoFetch.ts", "test"]
 }

@@ -5,6 +5,7 @@ import { App, currentFolder, settings } from '../app';
 import * as C from '../domain/catalog';
 import { ProjectMeta } from '../domain/model';
 import { displayPath, pathKey } from '../domain/paths';
+import { FETCH_MIN_INTERVAL_MS } from '../services/metadata';
 import { BoardState, HostMessage, WebviewMessage } from '../webview/protocol';
 
 export const VIEW_TYPE = 'repoBoard.dashboard';
@@ -65,6 +66,7 @@ export class DashboardPanel implements vscode.Disposable {
         if (e.affectsConfiguration('repoBoard')) this.postState();
       }),
       app.onScanning((scanning) => this.post({ type: 'scanning', scanning })),
+      app.onFetchOffline(() => this.postState()),
     );
     app.projects.on('change', this.onChange);
     app.meta.on('update', this.onMeta);
@@ -100,6 +102,7 @@ export class DashboardPanel implements vscode.Disposable {
       settings: { openInNewWindow: s.openInNewWindow, defaultView: s.defaultView, defaultSort: s.defaultSort, hasScanRoots: s.scanRoots.length > 0, startPage: s.showOnStartup, isMac: process.platform === 'darwin' },
       canAddCurrent: !!current && !this.app.projects.byPath(current),
       scanning: this.app.isScanning,
+      fetchOffline: this.app.isFetchOffline,
       gitAvailable: this.app.git.available,
     };
   }
@@ -108,9 +111,12 @@ export class DashboardPanel implements vscode.Disposable {
     this.post({ type: 'state', state: this.state() });
   }
 
-  /** Refreshes stale local state; with `fetch`, also fetches remotes (per setting). */
+  /**
+   * Refreshes stale local state; with `fetch`, also fetches (per the fetch-on-open setting) the repos nobody fetched in
+   * the last 10 minutes.
+   */
   private refreshVisible(fetch: boolean): void {
-    void this.app.meta.refresh(this.app.projects.projects.map((p) => p.path), { fetch });
+    void this.app.refreshAll(fetch ? { fetchMinAgeMs: FETCH_MIN_INTERVAL_MS } : {});
   }
 
   private async handle(m: WebviewMessage): Promise<void> {
@@ -124,7 +130,7 @@ export class DashboardPanel implements vscode.Disposable {
           this.post({ type: 'edit', id: this.pendingEdit });
           this.pendingEdit = undefined;
         }
-        this.refreshVisible(settings().fetchOnOpen);
+        this.refreshVisible(true);
         app.autoScanIfDue();
         return;
       case 'open':
@@ -184,7 +190,7 @@ export class DashboardPanel implements vscode.Disposable {
         if (project) {
           await app.meta.refreshOne(project.path, { force: true, fetch: true });
         } else {
-          void app.meta.refresh(app.projects.projects.map((p) => p.path), { force: true, fetch: settings().fetchOnOpen });
+          void app.refreshAll({ force: true, fetchMinAgeMs: 0 });
           void app.scan({ notify: false });
         }
         return;

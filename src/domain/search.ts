@@ -1,4 +1,4 @@
-import { GitStatus, Project, ProjectMeta, SortMode, changedFiles, pendingCount } from './model';
+import { GitStatus, Project, ProjectMeta, SortMode, changedFiles, pendingCount, stashCount } from './model';
 
 /**
  * Browser-safe search and sort, shared by the webview and the extension host.
@@ -144,6 +144,7 @@ export function sortProjects(projects: readonly Project[], meta: Readonly<Record
         (a, b) =>
           pendingCount(meta[b.id]?.git) - pendingCount(meta[a.id]?.git) ||
           changedFiles(meta[b.id]?.git) - changedFiles(meta[a.id]?.git) ||
+          stashCount(meta[b.id]?.git) - stashCount(meta[a.id]?.git) ||
           byName(a, b),
       );
   }

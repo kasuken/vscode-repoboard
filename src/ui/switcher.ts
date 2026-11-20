@@ -1,6 +1,7 @@
 import * as os from 'node:os';
 import * as vscode from 'vscode';
 import { App, settings } from '../app';
+import { fetchFreshness } from '../domain/freshness';
 import { Project, changedFiles } from '../domain/model';
 import { displayPath } from '../domain/paths';
 import { sortProjects } from '../domain/search';
@@ -44,6 +45,11 @@ export async function showSwitcher(app: App): Promise<void> {
         if (changes) bits.push(`$(diff) ${changes}`);
         if (git.behind) bits.push(`$(arrow-down)${git.behind}`);
         if (git.ahead) bits.push(`$(arrow-up)${git.ahead}`);
+        if (git.stashes) bits.push(`$(archive) ${git.stashes} stash${git.stashes === 1 ? '' : 'es'}`);
+        // Before you pick a repo to start work in: are its ahead/behind numbers trustworthy?
+        const fresh = fetchFreshness(git);
+        if (fresh.kind === 'stale' || fresh.kind === 'never') bits.push(`$(history) ${fresh.label}`);
+        if (fresh.kind === 'failed') bits.push(`$(warning) ${fresh.label}`);
         if (git.worktrees?.length) bits.push(`$(repo-forked) ${git.worktrees.length} worktree${git.worktrees.length === 1 ? '' : 's'}`);
       }
       if (m?.availability === 'missing') bits.push('$(warning) folder missing');

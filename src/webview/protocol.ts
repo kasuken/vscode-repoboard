@@ -24,6 +24,8 @@ export interface BoardState {
   settings: BoardSettings;
   canAddCurrent: boolean;
   scanning: boolean;
+  /** The last background fetch cycle failed for every repo it tried (no network?); background fetch keeps retrying. */
+  fetchOffline: boolean;
   gitAvailable: boolean;
 }
 
