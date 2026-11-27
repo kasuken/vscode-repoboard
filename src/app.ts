@@ -2,7 +2,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { dropNestedWorktrees, groupWorktrees, markOpened, mergeDiscovered, removeProject, togglePin } from './domain/catalog';
-import { Project, SortMode, ViewMode, WorktreeMode, changedFiles } from './domain/model';
+import { Project, SortMode, ViewMode, WorktreeMode, hasUncommittedWork } from './domain/model';
 import { expandHome, folderOf, pathKey } from './domain/paths';
 import { discoverRepos } from './services/discovery';
 import { GitClient, RemoteOp, worktreeMainOf } from './services/git';
@@ -472,7 +472,7 @@ export class App implements vscode.Disposable {
       this.log.appendLine(`[${op}] ${f.project.path}\n  ${f.message.replace(/\n/g, '\n  ')}`);
     }
     const behind = this.projects.projects.filter((p) => (this.meta.get(p.path)?.git?.behind ?? 0) > 0).length;
-    const dirty = this.projects.projects.filter((p) => changedFiles(this.meta.get(p.path)?.git) > 0).length;
+    const dirty = this.projects.projects.filter((p) => hasUncommittedWork(this.meta.get(p.path)?.git)).length;
     const summary =
       op === 'fetch'
         ? `Fetched ${candidates.length - failures.length}/${candidates.length} repos. ${behind} behind, ${dirty} with local changes.`

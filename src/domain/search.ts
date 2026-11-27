@@ -1,4 +1,5 @@
-import { GitStatus, Project, ProjectMeta, SortMode, changedFiles, pendingCount, stashCount } from './model';
+import { isFetchStale } from './freshness';
+import { GitStatus, Project, ProjectMeta, SortMode, attentionCount, changedFiles, hasStashes, hasUncommittedWork, stashCount } from './model';
 
 /**
  * Browser-safe search and sort, shared by the webview and the extension host.
@@ -142,12 +143,51 @@ export function sortProjects(projects: readonly Project[], meta: Readonly<Record
     case 'changes':
       return copy.sort(
         (a, b) =>
-          pendingCount(meta[b.id]?.git) - pendingCount(meta[a.id]?.git) ||
+          attentionCount(meta[b.id]?.git) - attentionCount(meta[a.id]?.git) ||
           changedFiles(meta[b.id]?.git) - changedFiles(meta[a.id]?.git) ||
           stashCount(meta[b.id]?.git) - stashCount(meta[a.id]?.git) ||
           byName(a, b),
       );
   }
+}
+
+export type StateFilter = 'all' | 'changes' | 'behind' | 'ahead' | 'stale' | 'missing' | 'stashes';
+
+/** The filter chips. "changes" includes edits in linked worktrees. */
+export function matchesStateFilter(filter: StateFilter, meta: ProjectMeta | undefined, now = Date.now()): boolean {
+  const git = meta?.git;
+  switch (filter) {
+    case 'all':
+      return true;
+    case 'changes':
+      return hasUncommittedWork(git);
+    case 'behind':
+      return (git?.behind ?? 0) > 0;
+    case 'ahead':
+      return (git?.ahead ?? 0) > 0;
+    case 'stashes':
+      return hasStashes(git);
+    case 'stale':
+      return isFetchStale(git, now);
+    case 'missing':
+      return !!meta && meta.availability !== 'ok';
+  }
+}
+
+export type RepoState = 'conflict' | 'missing' | 'offline' | 'dirty' | 'behind' | 'ahead' | 'clean' | 'nogit' | 'unknown';
+
+/** One state per repo, strongest first. Edits in a linked worktree make a clean main tree 'dirty' too. */
+export function repoStateOf(meta: ProjectMeta | undefined): RepoState {
+  if (!meta) return 'unknown';
+  if (meta.availability === 'missing') return 'missing';
+  if (meta.availability === 'offline') return 'offline';
+  const git = meta.git;
+  if (!git) return 'nogit';
+  if (git.conflicts) return 'conflict';
+  if (hasUncommittedWork(git)) return 'dirty';
+  if (git.behind) return 'behind';
+  if (git.ahead) return 'ahead';
+  return 'clean';
 }
 
 /** "3 min ago", "2 days ago", from a unix-ms timestamp. */

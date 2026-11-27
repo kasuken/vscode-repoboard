@@ -1,7 +1,7 @@
-import { Collection, GitStatus, ProjectMeta, SORT_MODES, SortMode, ViewMode, changedFiles, hasStashes, initialsFor, tagHue } from '../domain/model';
+import { Collection, GitStatus, ProjectMeta, SORT_MODES, SortMode, ViewMode, changedFiles, initialsFor, tagHue, worktreeChanges } from '../domain/model';
 import { stashLabel } from '../domain/gitParse';
-import { fetchFreshness, isFetchStale } from '../domain/freshness';
-import { fieldsOf, matchScore, relativeTime, sortProjects } from '../domain/search';
+import { fetchFreshness } from '../domain/freshness';
+import { RepoState, StateFilter, fieldsOf, matchScore, matchesStateFilter, relativeTime, repoStateOf, sortProjects } from '../domain/search';
 import type { BoardState, HostMessage, ProjectEdit, ProjectView, WebviewMessage } from './protocol';
 
 declare function acquireVsCodeApi(): { postMessage(m: unknown): void; getState(): unknown; setState(s: unknown): void };
@@ -10,7 +10,7 @@ const send = (m: WebviewMessage) => vscode.postMessage(m);
 
 // ── UI state (persisted per panel) ─────────────────────────────────────────
 
-type Filter = 'all' | 'changes' | 'behind' | 'ahead' | 'stale' | 'missing' | 'stashes';
+type Filter = StateFilter;
 interface UiState {
   query: string;
   sort?: SortMode;
@@ -61,26 +61,13 @@ const mod = () => (board?.settings.isMac ? '⌘' : 'Ctrl');
 
 // ── Derived data ───────────────────────────────────────────────────────────
 
-type RepoState = 'conflict' | 'missing' | 'offline' | 'dirty' | 'behind' | 'ahead' | 'clean' | 'nogit' | 'unknown';
-
-function stateOf(meta: ProjectMeta | undefined): RepoState {
-  if (!meta) return 'unknown';
-  if (meta.availability === 'missing') return 'missing';
-  if (meta.availability === 'offline') return 'offline';
-  const git = meta.git;
-  if (!git) return 'nogit';
-  if (git.conflicts) return 'conflict';
-  if (changedFiles(git)) return 'dirty';
-  if (git.behind) return 'behind';
-  if (git.ahead) return 'ahead';
-  return 'clean';
-}
+const stateOf = repoStateOf;
 
 const STATE_LABEL: Record<RepoState, string> = {
   conflict: 'has merge conflicts',
   missing: 'folder missing',
   offline: 'drive not connected',
-  dirty: 'has uncommitted changes',
+  dirty: 'has uncommitted changes (own tree or a linked worktree)',
   behind: 'behind its upstream',
   ahead: 'ahead of its upstream',
   clean: 'clean',
@@ -89,24 +76,7 @@ const STATE_LABEL: Record<RepoState, string> = {
 };
 
 function matchesFilter(p: ProjectView, filter: Filter): boolean {
-  const meta = board!.meta[p.id];
-  const git = meta?.git;
-  switch (filter) {
-    case 'all':
-      return true;
-    case 'changes':
-      return changedFiles(git) > 0;
-    case 'behind':
-      return (git?.behind ?? 0) > 0;
-    case 'ahead':
-      return (git?.ahead ?? 0) > 0;
-    case 'stashes':
-      return hasStashes(git);
-    case 'stale':
-      return isFetchStale(git);
-    case 'missing':
-      return !!meta && meta.availability !== 'ok';
-  }
+  return matchesStateFilter(filter, board!.meta[p.id]);
 }
 
 function collectionName(id: string | undefined): string | undefined {
@@ -319,7 +289,7 @@ function renderStrip(list: ProjectView[]): void {
 function renderFilters(): void {
   const b = board!;
   const count = (f: Filter) => b.projects.filter((p) => matchesFilter(p, f)).length;
-  const chip = (f: Filter, label: string, cls: string) => {
+  const chip = (f: Filter, label: string, cls: string, title?: string) => {
     const n = count(f);
     if (f !== 'all' && n === 0 && ui.filter !== f) return null;
     return h(
@@ -327,6 +297,7 @@ function renderFilters(): void {
       {
         type: 'button',
         class: `chip ${cls}${ui.filter === f ? ' on' : ''}`,
+        ...(title ? { title } : {}),
         'aria-pressed': String(ui.filter === f),
         onclick: () => {
           ui.filter = ui.filter === f && f !== 'all' ? 'all' : f;
@@ -368,7 +339,7 @@ function renderFilters(): void {
     });
   const items: Child[] = [
     chip('all', 'repos', 'f-all'),
-    chip('changes', 'with changes', 'f-dirty'),
+    chip('changes', 'with changes', 'f-dirty', 'Uncommitted changes, including linked worktrees'),
     chip('behind', 'behind', 'f-behind'),
     chip('ahead', 'ahead', 'f-ahead'),
     chip('stashes', 'with stashes', 'f-stash'),
@@ -480,14 +451,19 @@ function gitLine(git: GitStatus, compact = false, project?: ProjectView): HTMLEl
   }
   const trees = git.worktrees ?? [];
   if (trees.length && project) {
-    const dirty = trees.filter((w) => (w.changes ?? 0) > 0).length;
+    const live = trees.filter((w) => !w.prunable);
+    const dirtyTrees = live.filter((w) => (w.changes ?? 0) > 0);
+    const wtChanges = worktreeChanges(git);
+    const dirty = dirtyTrees.length;
+    const where = dirty <= 3 ? dirtyTrees.map((w) => w.branch).join(', ') : `${dirty} worktrees`;
+    const wtTitle = `${trees.length} linked worktree${trees.length === 1 ? '' : 's'}${dirty ? ` · ${wtChanges} uncommitted change${wtChanges === 1 ? '' : 's'} in ${where}` : ''}. Click to open one.`;
     parts.push(
       h(
         'button',
         {
           type: 'button',
-          class: `badge b-wt${dirty ? ' has-changes' : ''}`,
-          title: `${trees.length} linked worktree${trees.length === 1 ? '' : 's'}${dirty ? `, ${dirty} with changes` : ''}. Click to open one.`,
+          class: `badge b-wt${wtChanges ? ' has-changes' : ''}`,
+          title: wtTitle,
           'aria-label': `${trees.length} worktrees of ${project.name}`,
           onclick: (e: MouseEvent) => {
             e.stopPropagation();

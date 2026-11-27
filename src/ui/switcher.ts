@@ -2,7 +2,7 @@ import * as os from 'node:os';
 import * as vscode from 'vscode';
 import { App, settings } from '../app';
 import { fetchFreshness } from '../domain/freshness';
-import { Project, changedFiles } from '../domain/model';
+import { Project, changedFiles, worktreeChanges } from '../domain/model';
 import { displayPath } from '../domain/paths';
 import { sortProjects } from '../domain/search';
 
@@ -42,7 +42,9 @@ export async function showSwitcher(app: App): Promise<void> {
       if (git) {
         bits.push(`$(git-branch) ${git.branch}`);
         const changes = changedFiles(git);
-        if (changes) bits.push(`$(diff) ${changes}`);
+        const wtChanges = worktreeChanges(git);
+        if (changes) bits.push(`$(diff) ${changes}${wtChanges ? ` +${wtChanges} in worktrees` : ''}`);
+        else if (wtChanges) bits.push(`$(diff) +${wtChanges} in worktrees`);
         if (git.behind) bits.push(`$(arrow-down)${git.behind}`);
         if (git.ahead) bits.push(`$(arrow-up)${git.ahead}`);
         if (git.stashes) bits.push(`$(archive) ${git.stashes} stash${git.stashes === 1 ? '' : 'es'}`);

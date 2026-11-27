@@ -66,7 +66,8 @@
     lint: meta(git({ upstream: undefined, lastFetchAt: undefined, webUrl: undefined, stashes: 1, stashList: [stash('On main: fix flaky lint rule', 4 * D, 0)], lastCommit: c('Initial commit', 12 * H) }), lang([L.TS, 92], [L.SH, 8])),
     ray: meta(git({ untracked: 6, modified: 2, lastCommit: c('Soft shadows, finally', 6 * H) }), lang([L.RS, 100])),
     habit: meta(git({ behind: 1, lastCommit: c('Lock-screen widget', 9 * D) }), lang([L.SWIFT, 100])),
-    blog: meta(git({ lastCommit: c('Post: what I learned shipping a VS Code extension', 2 * D) }), lang([L.ASTRO, 58], [L.TS, 24], [L.CSS, 18])),
+    // Clean main tree, unfinished edits in an agent's worktree.
+    blog: meta(git({ lastCommit: c('Post: what I learned shipping a VS Code extension', 2 * D), worktrees: [{ path: 'C:/code/worktrees/blog/agent-rss-feed', branch: 'agent/rss-feed', detached: false, changes: 4, prunable: false, locked: false }] }), lang([L.ASTRO, 58], [L.TS, 24], [L.CSS, 18])),
     dotfiles: meta(null, lang([L.SH, 100])),
     photos: meta(git({ lastCommit: c('Deduplicate by hash', 70 * D) }), lang([L.PY, 100]), { availability: 'offline' }),
     legacy: meta(git({}), [], { availability: 'missing' }),

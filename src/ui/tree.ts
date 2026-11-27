@@ -2,7 +2,7 @@ import * as os from 'node:os';
 import * as vscode from 'vscode';
 import { App, settings } from '../app';
 import { fetchFreshness } from '../domain/freshness';
-import { Collection, Project, WorktreeInfo, changedFiles } from '../domain/model';
+import { Collection, Project, WorktreeInfo, changedFiles, hasUncommittedWork, worktreeChanges } from '../domain/model';
 import { displayPath, pathKey } from '../domain/paths';
 import { relativeTime, sortProjects } from '../domain/search';
 
@@ -92,6 +92,8 @@ export class ProjectTree implements vscode.TreeDataProvider<Node>, vscode.Dispos
       bits.push(git.branch);
       const changes = changedFiles(git);
       if (changes) bits.push(`●${changes}`);
+      const wtChanges = worktreeChanges(git);
+      if (wtChanges) bits.push(changes ? `+${wtChanges} in worktrees` : `●${wtChanges} in worktrees`);
       if (git.behind) bits.push(`↓${git.behind}`);
       if (git.ahead) bits.push(`↑${git.ahead}`);
       if (git.stashes) bits.push(`${git.stashes} stashed`);
@@ -102,7 +104,7 @@ export class ProjectTree implements vscode.TreeDataProvider<Node>, vscode.Dispos
     const current = this.app.isCurrent(p);
     item.iconPath = new vscode.ThemeIcon(
       m?.availability && m.availability !== 'ok' ? 'warning' : current ? 'circle-filled' : git ? 'repo' : 'folder',
-      current ? new vscode.ThemeColor('charts.green') : changedFiles(git) ? new vscode.ThemeColor('gitDecoration.modifiedResourceForeground') : undefined,
+      current ? new vscode.ThemeColor('charts.green') : hasUncommittedWork(git) ? new vscode.ThemeColor('gitDecoration.modifiedResourceForeground') : undefined,
     );
     const tip = new vscode.MarkdownString(undefined, true);
     tip.appendMarkdown(`**${escapeMd(p.name)}**${current ? ' · _current_' : ''}\n\n`);
@@ -120,6 +122,8 @@ export class ProjectTree implements vscode.TreeDataProvider<Node>, vscode.Dispos
         git.conflicts && `${git.conflicts} conflicts`,
       ].filter(Boolean);
       if (parts.length) tip.appendMarkdown(`$(diff) ${parts.join(', ')}  \n`);
+      const wtChanges = worktreeChanges(git);
+      if (wtChanges) tip.appendMarkdown(`$(repo-forked) ${wtChanges} change${wtChanges === 1 ? '' : 's'} in worktrees  \n`);
       if (git.stashes) {
         const oldest = git.stashList?.[git.stashList.length - 1];
         const age = oldest && git.stashList!.length === git.stashes ? ` (oldest ${relativeTime(oldest.time * 1000)})` : '';

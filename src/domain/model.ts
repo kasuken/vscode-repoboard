@@ -143,6 +143,27 @@ export function pendingCount(git: GitStatus | null | undefined): number {
   return git.staged + git.modified + git.untracked + git.conflicts + git.ahead + git.behind;
 }
 
+/** Uncommitted files across the live linked worktrees (prunable entries are gone from disk and ignored). */
+export function worktreeChanges(git: GitStatus | null | undefined): number {
+  let total = 0;
+  for (const w of git?.worktrees ?? []) {
+    if (!w.prunable) {
+      total += w.changes ?? 0;
+    }
+  }
+  return total;
+}
+
+/** Edits sitting in this repo's own tree or in any of its linked worktrees (where coding agents leave them). */
+export function hasUncommittedWork(git: GitStatus | null | undefined): boolean {
+  return changedFiles(git) > 0 || worktreeChanges(git) > 0;
+}
+
+/** `pendingCount` plus worktree edits: what the "Most changes" sort ranks by. */
+export function attentionCount(git: GitStatus | null | undefined): number {
+  return pendingCount(git) + worktreeChanges(git);
+}
+
 /** Stashed repos rank above truly clean ones when the pending counts tie. */
 export function stashCount(git: GitStatus | null | undefined): number {
   return git?.stashes ?? 0;
