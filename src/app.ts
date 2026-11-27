@@ -26,6 +26,7 @@ export function settings() {
     defaultSort: c.get<SortMode>('defaultSort', 'recent'),
     fetchOnOpen: c.get<boolean>('fetchOnOpen', true),
     fetchInterval: clampInt(c.get<number>('fetchInterval', 30), 0, 1440, 30),
+    pinStaleDays: clampInt(c.get<number>('pinStaleDays', 14), 0, 365, 14),
     cacheMinutes: Math.max(0, c.get<number>('cacheMinutes', 5)),
     detectLanguages: c.get<boolean>('detectLanguages', true),
     maxFilesScanned: Math.max(100, c.get<number>('maxFilesScanned', 10000)),

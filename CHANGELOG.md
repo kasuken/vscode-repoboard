@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.0
+
+- **Worktree edits count as changes.** A clean repo whose linked worktree has unfinished edits, such as an agent's
+  checkout, now shows up under **with changes**, in the colour strip and in *most changes*. The worktree badge says how
+  many changes are in which worktree.
+- **Nothing left unpushed.** The **ahead** chip is now **to push**. A branch that was never pushed shows *3 not pushed*
+  instead of "local only", a repo without a remote says *no remote*, and a *2 branches to push* badge lists other local
+  branches that are ahead of their upstream or have commits on no remote.
+- **Stale pins.** A pinned repo you haven't opened for two weeks says *not opened in 3 weeks* with an **Unpin** button,
+  and the Pinned header can unpin them all at once. New setting `repoBoard.pinStaleDays` (0 turns it off).
+
 ## 1.3.0
 
 - **Know how fresh "behind" is.** Every tile says when its repo was last fetched (*fetched 20m ago*) and turns it

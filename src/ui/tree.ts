@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import { App, settings } from '../app';
 import { branchToPushLabel } from '../domain/gitParse';
 import { fetchFreshness } from '../domain/freshness';
-import { Collection, Project, WorktreeInfo, changedFiles, hasUncommittedWork, worktreeChanges } from '../domain/model';
+import { Collection, Project, WorktreeInfo, changedFiles, hasUncommittedWork, idlePhrase, pinStaleness, worktreeChanges } from '../domain/model';
 import { displayPath, pathKey } from '../domain/paths';
 import { relativeTime, sortProjects } from '../domain/search';
 
@@ -110,7 +110,8 @@ export class ProjectTree implements vscode.TreeDataProvider<Node>, vscode.Dispos
       current ? new vscode.ThemeColor('charts.green') : hasUncommittedWork(git) ? new vscode.ThemeColor('gitDecoration.modifiedResourceForeground') : undefined,
     );
     const tip = new vscode.MarkdownString(undefined, true);
-    tip.appendMarkdown(`**${escapeMd(p.name)}**${current ? ' · _current_' : ''}\n\n`);
+    const stale = pinStaleness(p, settings().pinStaleDays);
+    tip.appendMarkdown(`**${escapeMd(p.name)}**${current ? ' · _current_' : ''}${stale.stale ? ` · ${idlePhrase(stale.idleMs)}` : ''}\n\n`);
     if (p.description) tip.appendMarkdown(`${escapeMd(p.description)}\n\n`);
     tip.appendMarkdown(`\`${escapeMd(displayPath(p.path, os.homedir()))}\`\n\n`);
     if (git) {

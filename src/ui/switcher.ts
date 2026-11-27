@@ -2,7 +2,7 @@ import * as os from 'node:os';
 import * as vscode from 'vscode';
 import { App, settings } from '../app';
 import { fetchFreshness } from '../domain/freshness';
-import { Project, changedFiles, worktreeChanges } from '../domain/model';
+import { Project, changedFiles, idlePhrase, pinStaleness, worktreeChanges } from '../domain/model';
 import { displayPath } from '../domain/paths';
 import { sortProjects } from '../domain/search';
 
@@ -56,6 +56,8 @@ export async function showSwitcher(app: App): Promise<void> {
         if (fresh.kind === 'failed') bits.push(`$(warning) ${fresh.label}`);
         if (git.worktrees?.length) bits.push(`$(repo-forked) ${git.worktrees.length} worktree${git.worktrees.length === 1 ? '' : 's'}`);
       }
+      const stale = pinStaleness(p, settings().pinStaleDays);
+      if (stale.stale) bits.push(`$(history) ${idlePhrase(stale.idleMs)}`);
       if (m?.availability === 'missing') bits.push('$(warning) folder missing');
       if (m?.availability === 'offline') bits.push('$(debug-disconnect) drive not connected');
       if (p.collectionId && collections.has(p.collectionId)) bits.push(`$(folder-library) ${collections.get(p.collectionId)}`);

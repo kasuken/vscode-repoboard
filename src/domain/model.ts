@@ -268,3 +268,29 @@ export function tagHue(tag: string): number {
   }
   return hash % 360;
 }
+
+const DAY_MS = 24 * 3_600_000;
+
+/**
+ * Is this pin stale? Idle time counts from the later of the last open and the day the repo was added
+ * (a never-opened repo is as old as its catalog entry). Stale only when pinned, `days` > 0 and idle ≥ `days` days.
+ */
+export function pinStaleness(project: Pick<Project, 'pinned' | 'lastOpenedAt' | 'addedAt'>, days: number, now = Date.now()): { stale: boolean; idleMs: number } {
+  const idleMs = Math.max(0, now - Math.max(project.lastOpenedAt ?? 0, project.addedAt));
+  return { stale: !!project.pinned && days > 0 && idleMs >= days * DAY_MS, idleMs };
+}
+
+/** The pinned projects that went stale (see `pinStaleness`), in the order given. */
+export function stalePins<T extends Pick<Project, 'pinned' | 'lastOpenedAt' | 'addedAt'>>(projects: readonly T[], days: number, now = Date.now()): T[] {
+  return projects.filter((p) => pinStaleness(p, days, now).stale);
+}
+
+/** "not opened in 16 days" / "in 3 weeks" / "in 2 months" / "in 1 year". */
+export function idlePhrase(idleMs: number): string {
+  const days = Math.max(0, Math.floor(idleMs / DAY_MS));
+  const plural = (n: number, unit: string) => `${n} ${unit}${n === 1 ? '' : 's'}`;
+  if (days < 21) return `not opened in ${plural(days, 'day')}`;
+  if (days < 60) return `not opened in ${plural(Math.floor(days / 7), 'week')}`;
+  if (days < 365) return `not opened in ${plural(Math.floor(days / 30), 'month')}`;
+  return `not opened in ${plural(Math.floor(days / 365), 'year')}`;
+}

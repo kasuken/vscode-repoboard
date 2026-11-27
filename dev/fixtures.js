@@ -30,7 +30,7 @@
   });
   const projects = [
     P('storefront', 'storefront', { pinned: true, icon: '🛍️', description: 'Customer-facing web shop, Next.js on the edge', tags: ['acme', 'web'], collectionId: 'acme', lastOpenedAt: now - 1 * H, isCurrent: true, source: 'manual' }),
-    P('design', 'design-system', { pinned: true, icon: '🎨', description: 'Tokens, components and docs shared by every app', tags: ['web', 'oss'], collectionId: 'oss', lastOpenedAt: now - 4 * H }),
+    P('design', 'design-system', { pinned: true, icon: '🎨', description: 'Tokens, components and docs shared by every app', tags: ['web', 'oss'], collectionId: 'oss', lastOpenedAt: now - 21 * D }),
     P('payments', 'payments-api', { description: 'Payment orchestration service, .NET 10', tags: ['acme', 'dotnet'], collectionId: 'acme', lastOpenedAt: now - 1 * D }),
     P('checkout', 'checkout-web', { description: 'One-page checkout with Apple Pay and Klarna', tags: ['acme', 'web'], collectionId: 'acme', lastOpenedAt: now - 2 * D }),
     P('infra', 'acme-infra', { icon: '☁️', description: 'Terraform and Bicep for every environment', tags: ['acme', 'infra'], collectionId: 'acme', lastOpenedAt: now - 5 * D }),
@@ -81,7 +81,7 @@
     collections: empty ? [] : collections,
     meta: M,
     busy: params.get('still') ? [] : ['ray'],
-    settings: { openInNewWindow: false, defaultView: 'grid', defaultSort: 'recent', hasScanRoots: true, startPage: false, isMac: false },
+    settings: { openInNewWindow: false, defaultView: 'grid', defaultSort: 'recent', pinStaleDays: 14, hasScanRoots: true, startPage: false, isMac: false },
     canAddCurrent: false,
     scanning: false,
     fetchOffline: !!params.get('offline'),

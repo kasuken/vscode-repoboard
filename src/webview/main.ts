@@ -1,4 +1,4 @@
-import { Collection, GitStatus, ProjectMeta, SORT_MODES, SortMode, ViewMode, changedFiles, initialsFor, tagHue, worktreeChanges } from '../domain/model';
+import { Collection, GitStatus, ProjectMeta, SORT_MODES, SortMode, ViewMode, changedFiles, idlePhrase, initialsFor, pinStaleness, stalePins, tagHue, worktreeChanges } from '../domain/model';
 import { branchToPushLabel, stashLabel } from '../domain/gitParse';
 import { fetchFreshness } from '../domain/freshness';
 import { RepoState, StateFilter, fieldsOf, matchScore, matchesStateFilter, relativeTime, repoStateOf, sortProjects } from '../domain/search';
@@ -389,6 +389,7 @@ function renderSection(s: Section): HTMLElement {
         h('span', { class: 'count', text: String(s.projects.length) }),
       ),
       s.collection ? iconButton('edit', `Edit collection ${s.title}`, () => openCollectionDialog(s.collection)) : null,
+      s.pinned ? staleSummary(s.projects) : null,
     );
     if (s.collection && dragEnabled()) {
       head.draggable = true;
@@ -402,6 +403,38 @@ function renderSection(s: Section): HTMLElement {
   section.append(listEl);
   wireDrop(section, s);
   return section;
+}
+
+/** Stale pin (pinned, not opened for `pinStaleDays`): the idle phrase and the date, or undefined. */
+function staleInfo(p: ProjectView): { phrase: string; title: string } | undefined {
+  const { stale, idleMs } = pinStaleness(p, board?.settings.pinStaleDays ?? 0);
+  if (!stale) return undefined;
+  const since = new Date(Math.max(p.lastOpenedAt ?? 0, p.addedAt)).toLocaleDateString();
+  return { phrase: idlePhrase(idleMs), title: `Pinned, but you haven't opened it since ${since}.` };
+}
+
+/** Pinned section header extra: "· 2 not opened in 14+ days" and a button that unpins them all. */
+function staleSummary(projects: ProjectView[]): HTMLElement | null {
+  const days = board?.settings.pinStaleDays ?? 0;
+  const stale = stalePins(projects, days);
+  if (!stale.length) return null;
+  return h(
+    'span',
+    { class: 'stale-summary muted small' },
+    `· ${stale.length} not opened in ${days}+ days`,
+    h(
+      'button',
+      {
+        type: 'button',
+        class: 'link',
+        onclick: () => {
+          for (const p of stale) send({ type: 'pin', id: p.id, pinned: false });
+          toast(`Unpinned ${stale.length} repo${stale.length === 1 ? '' : 's'}`);
+        },
+      },
+      'Unpin them',
+    ),
+  );
 }
 
 function avatar(p: ProjectView, meta: ProjectMeta | undefined): HTMLElement {
@@ -589,6 +622,12 @@ function tile(p: ProjectView): HTMLElement {
   } else if (!meta) {
     body.push(h('div', { class: 'git muted small' }, icon('loading', 'codicon-modifier-spin'), 'Reading status…'));
   }
+  const stale = staleInfo(p);
+  if (stale) {
+    body.push(
+      h('div', { class: 'stale muted small', title: stale.title }, icon('history'), h('span', { text: stale.phrase }), h('button', { type: 'button', class: 'link', onclick: (e: MouseEvent) => { e.stopPropagation(); send({ type: 'pin', id: p.id, pinned: false }); } }, 'Unpin')),
+    );
+  }
   if (p.tags.length) body.push(h('div', { class: 'tags' }, ...p.tags.map((t) => h('span', { class: 'tag', style: { '--hue': String(tagHue(t)) }, text: `#${t}` }))));
 
   const actions = h(
@@ -658,7 +697,7 @@ function row(p: ProjectView): HTMLElement {
     },
     h('span', { class: `state-pip s-${st}`, title: STATE_LABEL[st], 'aria-hidden': 'true' }),
     avatar(p, meta),
-    h('div', { class: 'row-name' }, h('span', { class: 'name', text: p.name }), p.isCurrent ? h('span', { class: 'here', text: 'open here' }) : null, h('span', { class: 'path', text: p.displayPath, title: p.path })),
+    h('div', { class: 'row-name' }, h('span', { class: 'name', text: p.name }), p.isCurrent ? h('span', { class: 'here', text: 'open here' }) : null, staleInfo(p) ? h('span', { class: 'stale-icon muted', title: staleInfo(p)!.title }, icon('history')) : null, h('span', { class: 'path', text: p.displayPath, title: p.path })),
     git && !git.error && st !== 'missing' && st !== 'offline'
       ? gitLine(git, true, p)
       : h('span', { class: `muted small${st === 'missing' ? ' n-missing' : ''}`, text: git?.error ?? (st === 'nogit' ? 'no git' : STATE_LABEL[st]) }),

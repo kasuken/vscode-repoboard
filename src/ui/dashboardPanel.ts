@@ -99,7 +99,7 @@ export class DashboardPanel implements vscode.Disposable {
       collections: catalog.collections,
       meta,
       busy,
-      settings: { openInNewWindow: s.openInNewWindow, defaultView: s.defaultView, defaultSort: s.defaultSort, hasScanRoots: s.scanRoots.length > 0, startPage: s.showOnStartup, isMac: process.platform === 'darwin' },
+      settings: { openInNewWindow: s.openInNewWindow, defaultView: s.defaultView, defaultSort: s.defaultSort, pinStaleDays: s.pinStaleDays, hasScanRoots: s.scanRoots.length > 0, startPage: s.showOnStartup, isMac: process.platform === 'darwin' },
       canAddCurrent: !!current && !this.app.projects.byPath(current),
       scanning: this.app.isScanning,
       fetchOffline: this.app.isFetchOffline,

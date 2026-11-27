@@ -565,6 +565,13 @@
           "maximum": 1440,
           "description": "Minutes between background fetches of each repo. Repos fetched recently by any tool (git, VS Code, the Repo Board desktop app) are skipped. 0 turns it off."
         },
+        "repoBoard.pinStaleDays": {
+          "type": "number",
+          "default": 14,
+          "minimum": 0,
+          "maximum": 365,
+          "description": "Pinned repos not opened for this many days are marked so you can unpin them. 0 turns it off."
+        },
         "repoBoard.cacheMinutes": {
           "type": "number",
           "default": 5,

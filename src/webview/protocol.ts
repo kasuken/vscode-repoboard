@@ -11,6 +11,7 @@ export interface BoardSettings {
   openInNewWindow: boolean;
   defaultView: ViewMode;
   defaultSort: SortMode;
+  pinStaleDays: number;
   hasScanRoots: boolean;
   startPage: boolean;
   isMac: boolean;
