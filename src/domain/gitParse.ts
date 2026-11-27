@@ -1,4 +1,4 @@
-import { CommitInfo, StashEntry } from './model';
+import { BranchToPush, CommitInfo, StashEntry } from './model';
 
 /** Fields of `git status --porcelain=v2 --branch` that Repo Board shows. */
 export interface ParsedStatus {
@@ -283,4 +283,131 @@ export function stashLabel(message: string): string {
   const m = wip ?? on;
   const label = m ? (m[2]?.trim() ? `On ${m[1]} · ${m[2].trim()}` : `On ${m[1]}`) : text;
   return label.length > 80 ? `${label.slice(0, 79)}…` : label;
+}
+
+export interface BranchInfo {
+  name: string;
+  upstream?: string;
+  ahead: number;
+  behind: number;
+  /** The upstream branch no longer exists on the remote. */
+  gone: boolean;
+}
+
+/**
+ * Parses `for-each-ref --format=%(refname:short)%1f%(upstream:short)%1f%(upstream:track,nobracket) refs/heads`:
+ * `main US origin/main US behind 1`, `feature US origin/feature US ahead 2, behind 1`, `x US origin/x US gone`, `local US US`.
+ * Lines without exactly three fields are skipped.
+ */
+export function parseBranchList(stdout: string): BranchInfo[] {
+  const out: BranchInfo[] = [];
+  for (const line of stdout.split(/\r?\n/)) {
+    const f = line.split('\x1f');
+    if (f.length !== 3 || !f[0]) continue;
+    const track = f[2]!;
+    const ahead = track.match(/ahead (\d+)/);
+    const behind = track.match(/behind (\d+)/);
+    const info: BranchInfo = { name: f[0], ahead: ahead ? Number(ahead[1]) : 0, behind: behind ? Number(behind[1]) : 0, gone: /\bgone\b/.test(track) };
+    if (f[1]) info.upstream = f[1];
+    out.push(info);
+  }
+  return out;
+}
+
+/** The most commits `log --branches --not --remotes` is asked for. */
+export const UNPUSHED_LOG_LIMIT = 500;
+
+export interface UnpushedLog {
+  /** Every commit on a local branch that no remote-tracking ref contains, with its parents. */
+  commits: Map<string, string[]>;
+  /** Branch name to the commit it points at, from the decorations. */
+  tips: Map<string, string>;
+  /** The commit HEAD's branch points at (`HEAD -> x`). */
+  headTip?: string;
+  /** The read returned its limit, so there may be more commits. */
+  capped: boolean;
+}
+
+/**
+ * Parses `log --branches --not --remotes --format=%H%x1f%P%x1f%D -n 500`. `%D` lists `HEAD -> x`, plain branch names
+ * and `tag: t`; tags and a bare `HEAD` (detached) are ignored.
+ */
+export function parseUnpushedLog(stdout: string): UnpushedLog {
+  const commits = new Map<string, string[]>();
+  const tips = new Map<string, string>();
+  let headTip: string | undefined;
+  let lines = 0;
+  for (const line of stdout.split(/\r?\n/)) {
+    if (!line) continue;
+    lines++;
+    const f = line.split('\x1f');
+    if (f.length < 2 || !f[0]) continue;
+    const hash = f[0];
+    commits.set(hash, f[1] ? f[1].split(' ').filter(Boolean) : []);
+    for (const raw of (f[2] ?? '').split(',')) {
+      const token = raw.trim();
+      if (!token || token === 'HEAD' || token.startsWith('tag: ')) continue;
+      const head = token.match(/^HEAD -> (.+)$/);
+      const name = head ? head[1]! : token;
+      tips.set(name, hash);
+      if (head) headTip = hash;
+    }
+  }
+  const log: UnpushedLog = { commits, tips, capped: lines >= UNPUSHED_LOG_LIMIT };
+  if (headTip) log.headTip = headTip;
+  return log;
+}
+
+/** How many commits of the unpushed set are reachable from `tip`, walking only through parents that are in the set. */
+export function countReachable(tip: string | undefined, commits: Map<string, string[]>): number {
+  if (!tip || !commits.has(tip)) return 0;
+  const seen = new Set<string>([tip]);
+  const stack = [tip];
+  while (stack.length) {
+    const hash = stack.pop()!;
+    for (const parent of commits.get(hash) ?? []) {
+      if (!seen.has(parent) && commits.has(parent)) {
+        seen.add(parent);
+        stack.push(parent);
+      }
+    }
+  }
+  return seen.size;
+}
+
+export interface UnpushedSummary {
+  /** Unpushed commits on the current branch; only set for a branch without a live upstream. */
+  current?: number;
+  others: BranchToPush[];
+}
+
+/**
+ * What exists only on this machine. Without a remote every commit is "unpushed", which says nothing, so nothing is
+ * reported. The current branch counts only when it has no live upstream (otherwise `git status` already gives `ahead`).
+ */
+export function unpushedSummary(input: { branches: BranchInfo[]; unpushed: UnpushedLog; currentBranch: string | undefined; hasRemote: boolean }): UnpushedSummary {
+  const { branches, unpushed, currentBranch, hasRemote } = input;
+  if (!hasRemote) return { others: [] };
+  const result: UnpushedSummary = { others: [] };
+  for (const b of branches) {
+    const live = !!b.upstream && !b.gone;
+    if (b.name === currentBranch) {
+      if (!live) {
+        const n = countReachable(unpushed.headTip ?? unpushed.tips.get(b.name), unpushed.commits);
+        if (n > 0) result.current = n;
+      }
+    } else if (live) {
+      if (b.ahead > 0) result.others.push({ name: b.name, count: b.ahead, kind: 'ahead', upstream: b.upstream! });
+    } else {
+      const n = countReachable(unpushed.tips.get(b.name), unpushed.commits);
+      if (n > 0) result.others.push({ name: b.name, count: n, kind: 'unpushed' });
+    }
+  }
+  result.others.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)).splice(20);
+  return result;
+}
+
+/** Menu line for one branch with work to push: `other-local · 1 commit not on any remote`, `feature · 2 ahead of origin/feature`. */
+export function branchToPushLabel(b: BranchToPush): string {
+  return b.kind === 'ahead' ? `${b.name} · ${b.count} ahead of ${b.upstream ?? 'its upstream'}` : `${b.name} · ${b.count} ${b.count === 1 ? 'commit' : 'commits'} not on any remote`;
 }

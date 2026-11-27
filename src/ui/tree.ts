@@ -1,6 +1,7 @@
 import * as os from 'node:os';
 import * as vscode from 'vscode';
 import { App, settings } from '../app';
+import { branchToPushLabel } from '../domain/gitParse';
 import { fetchFreshness } from '../domain/freshness';
 import { Collection, Project, WorktreeInfo, changedFiles, hasUncommittedWork, worktreeChanges } from '../domain/model';
 import { displayPath, pathKey } from '../domain/paths';
@@ -96,6 +97,8 @@ export class ProjectTree implements vscode.TreeDataProvider<Node>, vscode.Dispos
       if (wtChanges) bits.push(changes ? `+${wtChanges} in worktrees` : `●${wtChanges} in worktrees`);
       if (git.behind) bits.push(`↓${git.behind}`);
       if (git.ahead) bits.push(`↑${git.ahead}`);
+      if (git.unpushed) bits.push(`↑${git.unpushed}${git.unpushedCapped ? '+' : ''} not pushed`);
+      if (git.branchesToPush?.length) bits.push(`${git.branchesToPush.length} branch${git.branchesToPush.length === 1 ? '' : 'es'} to push`);
       if (git.stashes) bits.push(`${git.stashes} stashed`);
     }
     if (m?.availability === 'missing') bits.push('missing');
@@ -124,6 +127,8 @@ export class ProjectTree implements vscode.TreeDataProvider<Node>, vscode.Dispos
       if (parts.length) tip.appendMarkdown(`$(diff) ${parts.join(', ')}  \n`);
       const wtChanges = worktreeChanges(git);
       if (wtChanges) tip.appendMarkdown(`$(repo-forked) ${wtChanges} change${wtChanges === 1 ? '' : 's'} in worktrees  \n`);
+      if (git.unpushed) tip.appendMarkdown(`$(arrow-up) ${git.unpushed}${git.unpushedCapped ? ' or more' : ''} commit${git.unpushed === 1 && !git.unpushedCapped ? '' : 's'} on ${escapeMd(git.branch)} not on any remote  \n`);
+      for (const b of git.branchesToPush ?? []) tip.appendMarkdown(`$(git-branch) ${escapeMd(branchToPushLabel(b))}  \n`);
       if (git.stashes) {
         const oldest = git.stashList?.[git.stashList.length - 1];
         const age = oldest && git.stashList!.length === git.stashes ? ` (oldest ${relativeTime(oldest.time * 1000)})` : '';

@@ -1,5 +1,5 @@
 import { isFetchStale } from './freshness';
-import { GitStatus, Project, ProjectMeta, SortMode, attentionCount, changedFiles, hasStashes, hasUncommittedWork, stashCount } from './model';
+import { GitStatus, Project, ProjectMeta, SortMode, attentionCount, changedFiles, hasStashes, hasUncommittedWork, hasWorkToPush, stashCount } from './model';
 
 /**
  * Browser-safe search and sort, shared by the webview and the extension host.
@@ -164,7 +164,7 @@ export function matchesStateFilter(filter: StateFilter, meta: ProjectMeta | unde
     case 'behind':
       return (git?.behind ?? 0) > 0;
     case 'ahead':
-      return (git?.ahead ?? 0) > 0;
+      return hasWorkToPush(git);
     case 'stashes':
       return hasStashes(git);
     case 'stale':
@@ -186,7 +186,7 @@ export function repoStateOf(meta: ProjectMeta | undefined): RepoState {
   if (git.conflicts) return 'conflict';
   if (hasUncommittedWork(git)) return 'dirty';
   if (git.behind) return 'behind';
-  if (git.ahead) return 'ahead';
+  if (git.ahead || (git.unpushed ?? 0) > 0) return 'ahead';
   return 'clean';
 }
 

@@ -47,7 +47,7 @@
   ];
   // lastFetchAt (ms) is when anyone last fetched: mostly minutes ago, overridden below for the stale / failed / never cases.
   let fetchSeq = 0;
-  const git = (o) => ({ branch: 'main', detached: false, upstream: 'origin/main', ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, conflicts: 0, stashes: 0, fetchedAt: now - 300000, lastFetchAt: now - (4 + (fetchSeq++ % 7) * 6) * 60000, webUrl: 'https://github.com/acme/repo', ...o });
+  const git = (o) => ({ branch: 'main', detached: false, upstream: 'origin/main', ahead: 0, behind: 0, staged: 0, modified: 0, untracked: 0, conflicts: 0, stashes: 0, hasRemote: true, fetchedAt: now - 300000, lastFetchAt: now - (4 + (fetchSeq++ % 7) * 6) * 60000, webUrl: 'https://github.com/acme/repo', ...o });
   const stash = (message, seconds, i) => ({ ref: `stash@{${i}}`, time: ago(seconds), message });
   const c = (subject, seconds) => ({ hash: Math.random().toString(16).slice(2, 9), subject, author: 'you', time: ago(seconds) });
   const meta = (g, languages, extra = {}) => ({ availability: 'ok', git: g, languages, updatedAt: now, languagesAt: now, ...extra });
@@ -63,9 +63,11 @@
     infra: meta(git({ lastFetchAt: now - 14 * D * 1000, fetchError: "fatal: Authentication failed for 'https://dev.azure.com/acme/_git/acme-infra'", lastCommit: c('Scale staging down at night', 5 * D) }), lang([L.HCL, 64], [L.BICEP, 30], [L.SH, 6])),
     router: meta(git({ conflicts: 2, modified: 1, lastCommit: c('Merge branch main into v3', 3 * D) }), lang([L.TS, 100])),
     theme: meta(git({ lastFetchAt: undefined, lastCommit: c('Softer selection background', 20 * D) }), lang([L.JS, 100])),
-    lint: meta(git({ upstream: undefined, lastFetchAt: undefined, webUrl: undefined, stashes: 1, stashList: [stash('On main: fix flaky lint rule', 4 * D, 0)], lastCommit: c('Initial commit', 12 * H) }), lang([L.TS, 92], [L.SH, 8])),
-    ray: meta(git({ untracked: 6, modified: 2, lastCommit: c('Soft shadows, finally', 6 * H) }), lang([L.RS, 100])),
-    habit: meta(git({ behind: 1, lastCommit: c('Lock-screen widget', 9 * D) }), lang([L.SWIFT, 100])),
+    lint: meta(git({ hasRemote: false, upstream: undefined, lastFetchAt: undefined, webUrl: undefined, stashes: 1, stashList: [stash('On main: fix flaky lint rule', 4 * D, 0)], lastCommit: c('Initial commit', 12 * H) }), lang([L.TS, 92], [L.SH, 8])),
+    // Current branch never pushed: two local commits no remote has.
+    ray: meta(git({ branch: 'feature/denoise', upstream: undefined, lastFetchAt: undefined, unpushed: 2, untracked: 6, modified: 2, lastCommit: c('Soft shadows, finally', 6 * H) }), lang([L.RS, 100])),
+    // Other branches with work no remote has: one never pushed, one ahead of its upstream.
+    habit: meta(git({ behind: 1, branchesToPush: [{ name: 'experiment/watch-app', count: 3, kind: 'unpushed' }, { name: 'fix/widget-crash', count: 1, kind: 'ahead', upstream: 'origin/fix/widget-crash' }], lastCommit: c('Lock-screen widget', 9 * D) }), lang([L.SWIFT, 100])),
     // Clean main tree, unfinished edits in an agent's worktree.
     blog: meta(git({ lastCommit: c('Post: what I learned shipping a VS Code extension', 2 * D), worktrees: [{ path: 'C:/code/worktrees/blog/agent-rss-feed', branch: 'agent/rss-feed', detached: false, changes: 4, prunable: false, locked: false }] }), lang([L.ASTRO, 58], [L.TS, 24], [L.CSS, 18])),
     dotfiles: meta(null, lang([L.SH, 100])),

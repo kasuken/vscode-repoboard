@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import { LOG_FORMAT, describeGitError, parseLogLine, parsePorcelainV2, parseStashList, parseWorktreeList, pickRemoteUrl, remoteToWebUrl, worktreeMainFromGitFile } from '../domain/gitParse';
+import { LOG_FORMAT, describeGitError, parseBranchList, parseUnpushedLog, unpushedSummary, parseLogLine, parsePorcelainV2, parseStashList, parseWorktreeList, pickRemoteUrl, remoteToWebUrl, worktreeMainFromGitFile } from '../domain/gitParse';
 import { GitStatus, WorktreeInfo } from '../domain/model';
 
 export type RemoteOp = 'fetch' | 'pull' | 'push';
@@ -149,11 +149,13 @@ export class GitClient {
       return null;
     }
     const read = (args: string[]) => run(folder, [...READ_FLAGS, ...args], this.timeoutMs);
-    const [st, log, stash, remotes, lastFetch] = await Promise.all([
+    const [st, log, stash, remotes, branches, unpushedLog, lastFetch] = await Promise.all([
       read(['status', '--porcelain=v2', '--branch']),
       read(['log', '-1', `--format=${LOG_FORMAT}`]),
       read(['stash', 'list', '--format=%gd%x1f%ct%x1f%gs']),
       read(['remote', '-v']),
+      read(['for-each-ref', '--format=%(refname:short)%1f%(upstream:short)%1f%(upstream:track,nobracket)', 'refs/heads']),
+      read(['log', '--branches', '--not', '--remotes', '--format=%H%x1f%P%x1f%D', '-n', '500']),
       gitLastFetch(folder).catch(() => null),
     ]);
     if (st.missingGit) {
@@ -194,11 +196,28 @@ export class GitClient {
     if (webUrl) {
       status.webUrl = webUrl;
     }
+    if (remotes.ok) {
+      status.hasRemote = remotes.stdout.trim().length > 0;
+    }
+    // Work no remote has: the current branch when it has no live upstream, and (on the main repo) other local branches.
+    const unpushedParsed = branches.ok && unpushedLog.ok && status.hasRemote ? parseUnpushedLog(unpushedLog.stdout) : undefined;
+    const summary = unpushedParsed
+      ? unpushedSummary({ branches: parseBranchList(branches.stdout), unpushed: unpushedParsed, currentBranch: parsed.detached ? undefined : parsed.branch, hasRemote: true })
+      : undefined;
+    if (summary?.current) {
+      status.unpushed = summary.current;
+      if (unpushedParsed?.capped) {
+        status.unpushedCapped = true;
+      }
+    }
     const main = await worktreeMainOf(folder);
     if (main) {
       // refs/stash is shared with the main repo, which shows it; repeating it on every worktree tile is noise.
       status.worktreeOf = main;
     } else {
+      if (summary?.others.length) {
+        status.branchesToPush = summary.others;
+      }
       status.stashes = stashList.length;
       if (stashList.length) {
         status.stashList = stashList.slice(0, 50);

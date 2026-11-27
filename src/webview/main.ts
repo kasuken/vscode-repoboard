@@ -1,5 +1,5 @@
 import { Collection, GitStatus, ProjectMeta, SORT_MODES, SortMode, ViewMode, changedFiles, initialsFor, tagHue, worktreeChanges } from '../domain/model';
-import { stashLabel } from '../domain/gitParse';
+import { branchToPushLabel, stashLabel } from '../domain/gitParse';
 import { fetchFreshness } from '../domain/freshness';
 import { RepoState, StateFilter, fieldsOf, matchScore, matchesStateFilter, relativeTime, repoStateOf, sortProjects } from '../domain/search';
 import type { BoardState, HostMessage, ProjectEdit, ProjectView, WebviewMessage } from './protocol';
@@ -341,7 +341,7 @@ function renderFilters(): void {
     chip('all', 'repos', 'f-all'),
     chip('changes', 'with changes', 'f-dirty', 'Uncommitted changes, including linked worktrees'),
     chip('behind', 'behind', 'f-behind'),
-    chip('ahead', 'ahead', 'f-ahead'),
+    chip('ahead', 'to push', 'f-ahead', 'Commits that exist only on this machine: ahead of the upstream, on a branch never pushed, or on other local branches'),
     chip('stashes', 'with stashes', 'f-stash'),
     chip('missing', 'unavailable', 'f-missing'),
     chip('stale', 'not fetched recently', 'f-stale'),
@@ -424,6 +424,37 @@ function gitLine(git: GitStatus, compact = false, project?: ProjectView): HTMLEl
   }
   if (git.behind) parts.push(h('span', { class: 'badge b-behind', title: `${git.behind} commit(s) to pull from ${git.upstream}` }, icon('arrow-down'), String(git.behind)));
   if (git.ahead) parts.push(h('span', { class: 'badge b-ahead', title: `${git.ahead} commit(s) to push to ${git.upstream}` }, icon('arrow-up'), String(git.ahead)));
+  if ((git.unpushed ?? 0) > 0) {
+    const n = git.unpushed!;
+    const more = git.unpushedCapped ? '+' : '';
+    const title = `${n}${git.unpushedCapped ? ' or more' : ''} commit${n === 1 && !git.unpushedCapped ? '' : 's'} on ${git.branch} aren't on any remote yet`;
+    parts.push(h('span', { class: 'badge b-ahead', title }, icon('arrow-up'), compact ? `${n}${more}` : `${n}${more} not pushed`));
+  }
+  const toPush = git.branchesToPush ?? [];
+  if (toPush.length) {
+    const n = toPush.length;
+    const title = `${n} other branch${n === 1 ? '' : 'es'} with commits to push: ${toPush.map(branchToPushLabel).join('; ')}`;
+    const label = compact ? String(n) : `${n} branch${n === 1 ? '' : 'es'} to push`;
+    parts.push(
+      project
+        ? h(
+            'button',
+            {
+              type: 'button',
+              class: 'badge b-topush',
+              title: `${title}. Click to list them.`,
+              'aria-label': `${n} branches to push in ${project.name}`,
+              onclick: (e: MouseEvent) => {
+                e.stopPropagation();
+                openBranchesMenu(project, e.currentTarget as HTMLElement);
+              },
+            },
+            icon('git-branch'),
+            label,
+          )
+        : h('span', { class: 'badge b-topush', title }, icon('git-branch'), label),
+    );
+  }
   if (git.stashes) {
     const n = git.stashes;
     const oldest = git.stashList?.[git.stashList.length - 1];
@@ -487,7 +518,10 @@ function gitLine(git: GitStatus, compact = false, project?: ProjectView): HTMLEl
       parts.push(h('span', { class: `fetched muted small${warn ? ' warn' : ''}`, title: fresh.title }, warn ? icon(fresh.kind === 'failed' ? 'warning' : 'history') : null, fresh.label));
     }
   }
-  if (!git.upstream && !compact) parts.push(h('span', { class: 'muted small', text: 'local only' }));
+  if (!git.upstream && !compact && !git.detached) {
+    if (git.hasRemote === false) parts.push(h('span', { class: 'muted small', title: 'This repo has no remote: its commits exist only on this machine', text: 'no remote' }));
+    else if (!git.unpushed) parts.push(h('span', { class: 'muted small', title: `${git.branch} has no upstream branch`, text: 'no upstream' }));
+  }
   return h('div', { class: 'git' }, ...parts);
 }
 
@@ -983,6 +1017,15 @@ function openTileMenu(p: ProjectView, anchor: HTMLElement, at?: MouseEvent): voi
     ],
     at,
   );
+}
+
+/** Lists the other local branches that hold commits no remote has (read-only) and offers a terminal to push them. */
+function openBranchesMenu(p: ProjectView, anchor: HTMLElement): void {
+  const list = board!.meta[p.id]?.git?.branchesToPush ?? [];
+  const items: Array<MenuItem | 'sep'> = list.map((b) => ({ label: branchToPushLabel(b), icon: 'git-branch', title: b.kind === 'ahead' ? `Ahead of ${b.upstream ?? 'its upstream'}` : 'No remote has these commits', run: () => undefined }));
+  items.push('sep');
+  items.push({ label: 'Open terminal here', icon: 'terminal', title: 'Then git push the branch', run: () => send({ type: 'terminal', id: p.id }) });
+  showMenu(anchor, items);
 }
 
 /** Lists a repo's stash entries (read-only) and offers a terminal to pop them. */

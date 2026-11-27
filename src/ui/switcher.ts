@@ -47,6 +47,8 @@ export async function showSwitcher(app: App): Promise<void> {
         else if (wtChanges) bits.push(`$(diff) +${wtChanges} in worktrees`);
         if (git.behind) bits.push(`$(arrow-down)${git.behind}`);
         if (git.ahead) bits.push(`$(arrow-up)${git.ahead}`);
+        if (git.unpushed) bits.push(`$(arrow-up) ${git.unpushed}${git.unpushedCapped ? '+' : ''} not pushed`);
+        if (git.branchesToPush?.length) bits.push(`$(git-branch) ${git.branchesToPush.length} branch${git.branchesToPush.length === 1 ? '' : 'es'} to push`);
         if (git.stashes) bits.push(`$(archive) ${git.stashes} stash${git.stashes === 1 ? '' : 'es'}`);
         // Before you pick a repo to start work in: are its ahead/behind numbers trustworthy?
         const fresh = fetchFreshness(git);

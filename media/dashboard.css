@@ -517,5 +517,8 @@ body.vscode-light .chip.tag { border-color: hsl(var(--hue) 45% 45% / .4); }
 .badge.b-stash { border: 1px solid color-mix(in srgb, var(--st-stash) 45%, var(--border)); border-radius: 10px; padding: 0 7px; height: 18px; background: transparent; font: inherit; font-size: 11.5px; font-weight: 500; cursor: pointer; }
 .badge.b-stash:hover { background: color-mix(in srgb, var(--st-stash) 12%, transparent); }
 .menu-item:disabled { opacity: 0.6; cursor: default; pointer-events: none; }
+.badge.b-topush { border: 1px solid color-mix(in srgb, var(--st-ahead) 45%, var(--border)); border-radius: 10px; padding: 0 7px; height: 18px; background: transparent; color: var(--st-ahead); font: inherit; font-size: 11.5px; font-weight: 500; cursor: pointer; }
+.badge.b-topush:hover { background: color-mix(in srgb, var(--st-ahead) 12%, transparent); }
+span.badge.b-topush { cursor: default; }
 .badge.b-wt:hover { color: var(--fg); border-color: color-mix(in srgb, var(--fg) 35%, var(--border)); }
 .badge.b-wt.has-changes { color: var(--st-dirty); border-color: color-mix(in srgb, var(--st-dirty) 45%, var(--border)); }

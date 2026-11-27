@@ -86,10 +86,26 @@ export interface GitStatus {
   fetchError?: string;
   /** Human-readable reason git could not read the repo (e.g. dubious ownership). */
   error?: string;
+  /** False when the repo has no remote at all (from `git remote -v`); undefined when that read failed. */
+  hasRemote?: boolean;
+  /** Commits on the current branch that no remote has, when it has no (live) upstream. Absent when 0 or unknown. */
+  unpushed?: number;
+  /** `unpushed` hit the 500-commit read limit: the real number is at least this. */
+  unpushedCapped?: boolean;
+  /** Other local branches holding work no remote has (main repo only: branches are shared with linked worktrees). */
+  branchesToPush?: BranchToPush[];
   /** Linked worktrees of this repo (the main working tree itself is not listed). */
   worktrees?: WorktreeInfo[];
   /** Set when this folder is itself a linked worktree: the main repo's folder. */
   worktreeOf?: string;
+}
+
+export interface BranchToPush {
+  name: string;
+  count: number;
+  /** `ahead`: the branch has an upstream and is ahead of it. `unpushed`: no (live) upstream; commits no remote has. */
+  kind: 'ahead' | 'unpushed';
+  upstream?: string;
 }
 
 export interface WorktreeInfo {
@@ -140,7 +156,7 @@ export function pendingCount(git: GitStatus | null | undefined): number {
   if (!git) {
     return 0;
   }
-  return git.staged + git.modified + git.untracked + git.conflicts + git.ahead + git.behind;
+  return git.staged + git.modified + git.untracked + git.conflicts + git.ahead + git.behind + (git.unpushed ?? 0);
 }
 
 /** Uncommitted files across the live linked worktrees (prunable entries are gone from disk and ignored). */
@@ -172,6 +188,11 @@ export function stashCount(git: GitStatus | null | undefined): number {
 /** The "with stashes" filter chip. */
 export function hasStashes(git: GitStatus | null | undefined): boolean {
   return stashCount(git) > 0;
+}
+
+/** Work that exists only on this machine: commits ahead of the upstream, on a branch never pushed, or on other local branches. */
+export function hasWorkToPush(git: GitStatus | null | undefined): boolean {
+  return !!git && (git.ahead > 0 || (git.unpushed ?? 0) > 0 || (git.branchesToPush?.length ?? 0) > 0);
 }
 
 export function changedFiles(git: GitStatus | null | undefined): number {
