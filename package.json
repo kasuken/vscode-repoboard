@@ -2,7 +2,7 @@
   "name": "vscode-repoboard",
   "displayName": "Repo Board",
   "description": "All your git repos on one board: auto-discovers every repo on disk, shows which ones are dirty, behind or ahead at a glance, and switches between them with Ctrl+Alt+P. Fetch or pull them all in one click.",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "publisher": "emanuelebartolesi",
   "author": {
     "name": "Emanuele Bartolesi",
